@@ -146,7 +146,7 @@ button.ghost{background:transparent}
     <div class="field">
       <label for="model">Chất lượng</label>
       <select id="model">
-        <option value="isnet">Cao nhất (tải ~170 MB lần đầu)</option>
+        <option value="isnet">Cao nhất (~170 MB, chỉ PC)</option>
         <option value="isnet_fp16" selected>Cân bằng (~80 MB)</option>
         <option value="isnet_quint8">Nhanh (~40 MB)</option>
       </select>
@@ -156,6 +156,14 @@ button.ghost{background:transparent}
       <select id="device">
         <option value="cpu" selected>CPU (ổn định)</option>
         <option value="gpu">GPU (nhanh hơn, thử nghiệm)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="clean">Làm sạch nền thừa</label>
+      <select id="clean">
+        <option value="off">Tắt (giữ nguyên AI)</option>
+        <option value="normal" selected>Vừa</option>
+        <option value="strong">Mạnh</option>
       </select>
     </div>
     <div class="field">
@@ -220,7 +228,7 @@ const HEIC_LIB = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.
 
 const $ = id => document.getElementById(id);
 const els = { drop:$('drop'), file:$('file'), grid:$('grid'), empty:$('empty'), run:$('run'), saveAll:$('saveAll'), share:$('share'),
-  clear:$('clear'), msg:$('msg'), meter:$('meter'), bar:$('meterbar'), count:$('count'), model:$('model'), engine:$('engine'), device:$('device'), bg:$('bg'), color:$('color'), fmt:$('fmt'), maxdim:$('maxdim') };
+  clear:$('clear'), msg:$('msg'), meter:$('meter'), bar:$('meterbar'), count:$('count'), model:$('model'), engine:$('engine'), clean:$('clean'), device:$('device'), bg:$('bg'), color:$('color'), fmt:$('fmt'), maxdim:$('maxdim') };
 
 const items = [];   // {id,file,name,status,input,inputURL,w,h,fg,out,outURL,err,el}
 let busy = false, uid = 0, libMod = null, heicLoaded = null;
@@ -418,14 +426,68 @@ async function cut(_, blob){
     try { fg = await cutSmall(await getLib(), small); }
     catch(e){ console.warn('IMG.LY failed, switching to RMBG', e); els.msg.textContent='Chuyển sang bộ máy AI dự phòng…'; fg = await rmbgCut(small); }
   }
-  return applyMask(blob, fg);
+  return fg;
+}
+
+/* ---- Mask cleanup: kill faint "ghost" background, drop stray specks, keep the main subject(s) ---- */
+const CLEAN = {
+  off: null,
+  normal: { lo:0.30, hi:0.65, keep:0.04, grow:3 },
+  strong: { lo:0.45, hi:0.65, keep:0.15, grow:2 },
+};
+function dilate(K, w, h, r){
+  if (r<=0) return K;
+  const T=new Uint8Array(w*h), O=new Uint8Array(w*h), pre=new Int32Array(Math.max(w,h)+1);
+  for (let y=0;y<h;y++){            // horizontal
+    const o=y*w; pre[0]=0; for (let x=0;x<w;x++) pre[x+1]=pre[x]+K[o+x];
+    for (let x=0;x<w;x++){ const a=Math.max(0,x-r), b=Math.min(w,x+r+1); T[o+x]= pre[b]-pre[a]>0 ? 1:0; }
+  }
+  for (let x=0;x<w;x++){            // vertical
+    pre[0]=0; for (let y=0;y<h;y++) pre[y+1]=pre[y]+T[y*w+x];
+    for (let y=0;y<h;y++){ const a=Math.max(0,y-r), b=Math.min(h,y+r+1); O[y*w+x]= pre[b]-pre[a]>0 ? 1:0; }
+  }
+  return O;
+}
+async function refine(raw){
+  const p = CLEAN[els.clean.value]; if (!p) return raw;
+  const img = await loadImg(raw), w=img.naturalWidth, h=img.naturalHeight, n=w*h;
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const g=c.getContext('2d',{willReadFrequently:true}); g.drawImage(img,0,0);
+  const d=g.getImageData(0,0,w,h), px=d.data, a=new Uint8ClampedArray(n);
+  const lo=p.lo*255, hi=p.hi*255;
+  for (let i=0;i<n;i++){ const v=px[i*4+3]; a[i] = v<=lo ? 0 : v>=hi ? 255 : (v-lo)/(hi-lo)*255; }
+  // connected components of the solid part
+  const lab=new Int32Array(n), stack=new Int32Array(n), sizes=[0]; let cur=0;
+  for (let s0=0;s0<n;s0++){
+    if (a[s0]<128 || lab[s0]) continue;
+    cur++; let sp=0, sz=0; stack[sp++]=s0; lab[s0]=cur;
+    while (sp){ const q=stack[--sp]; sz++; const x=q%w;
+      if (x>0 && !lab[q-1] && a[q-1]>=128){ lab[q-1]=cur; stack[sp++]=q-1; }
+      if (x<w-1 && !lab[q+1] && a[q+1]>=128){ lab[q+1]=cur; stack[sp++]=q+1; }
+      if (q>=w && !lab[q-w] && a[q-w]>=128){ lab[q-w]=cur; stack[sp++]=q-w; }
+      if (q<n-w && !lab[q+w] && a[q+w]>=128){ lab[q+w]=cur; stack[sp++]=q+w; }
+    }
+    sizes.push(sz);
+  }
+  if (!cur) return raw;
+  const max=Math.max(...sizes.slice(1)), keep=new Uint8Array(cur+1);
+  for (let k=1;k<=cur;k++) keep[k] = sizes[k] >= max*p.keep ? 1:0;
+  let K=new Uint8Array(n); for (let i=0;i<n;i++) if (lab[i] && keep[lab[i]]) K[i]=1;
+  K = dilate(K,w,h,p.grow);         // keep the soft edge right around kept parts
+  for (let i=0;i<n;i++) px[i*4+3] = K[i] ? a[i] : 0;
+  g.putImageData(d,0,0);
+  return canvasToBlob(c,'image/png');
+}
+async function finalize(it){
+  it.fg = await applyMask(it.input, await refine(it.raw));
 }
 
 /* ---- Engine 2: BRIA RMBG-1.4 via Transformers.js 2.x (older ONNX runtime that works on iPhone Safari) ---- */
 const TJS = 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
-let rmbgP = null;
+const rmbgCache = {};
 function loadRmbg(){
-  return rmbgP ||= (async () => {
+  const quantized = els.model.value!=='isnet';
+  return rmbgCache[quantized] ||= (async () => {
     els.msg.textContent='Đang tải bộ máy AI…';
     const T = await import(TJS);
     T.env.allowLocalModels = false;
@@ -440,14 +502,14 @@ function loadRmbg(){
         els.msg.textContent = pc<100 ? `Đang tải mô hình AI (lần đầu)… ${pc}%` : 'Đã tải xong mô hình, AI đang phân tích ảnh…';
       }
     };
-    const model = await T.AutoModel.from_pretrained('briaai/RMBG-1.4', { config:{ model_type:'custom' }, quantized:true, progress_callback });
+    const model = await T.AutoModel.from_pretrained('briaai/RMBG-1.4', { config:{ model_type:'custom' }, quantized, progress_callback });
     const processor = await T.AutoProcessor.from_pretrained('briaai/RMBG-1.4', { config:{
       do_normalize:true, do_pad:false, do_rescale:true, do_resize:true,
       image_mean:[0.5,0.5,0.5], feature_extractor_type:'ImageFeatureExtractor',
       image_std:[1,1,1], resample:2, rescale_factor:0.00392156862745098,
       size:{ width:1024, height:1024 } } });
     return { T, model, processor };
-  })().catch(e => { rmbgP=null; throw e; });
+  })().catch(e => { delete rmbgCache[quantized]; throw e; });
 }
 async function rmbgCut(smallBlob){
   const { T, model, processor } = await loadRmbg();
@@ -512,7 +574,8 @@ els.run.onclick = async () => {
     k++; it.status='run'; it.err=''; paint(it); refresh();
     els.msg.textContent = `Đang xoá nền ảnh ${k}/${queue.length}: ${it.name}`;
     try{
-      it.fg = await cut(removeBackground, it.input);
+      it.raw = await cut(removeBackground, it.input);
+      await finalize(it);
       await rerender(it);
       it.status='done';
     }catch(e){ console.error(e); it.status='error'; it.err='Xử lý thất bại: '+(e.message||e); }
@@ -534,6 +597,9 @@ async function rerenderAll(){
 els.bg.onchange = () => { els.color.hidden = els.bg.value!=='custom'; rerenderAll(); };
 els.color.oninput = () => rerenderAll();
 els.fmt.onchange = () => rerenderAll();
+els.clean.onchange = async () => {
+  for (const it of items) if (it.raw){ await finalize(it); await rerender(it); paint(it); }
+};
 
 /* ---------- saving ---------- */
 function download(blob,name){
