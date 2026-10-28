@@ -144,6 +144,13 @@ button.ghost{background:transparent}
       </select>
     </div>
     <div class="field">
+      <label for="device">Bộ xử lý</label>
+      <select id="device">
+        <option value="cpu" selected>CPU (ổn định)</option>
+        <option value="gpu">GPU (nhanh hơn, thử nghiệm)</option>
+      </select>
+    </div>
+    <div class="field">
       <label for="bg">Nền mới</label>
       <div class="bgset">
         <select id="bg">
@@ -205,10 +212,10 @@ const HEIC_LIB = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.
 
 const $ = id => document.getElementById(id);
 const els = { drop:$('drop'), file:$('file'), grid:$('grid'), empty:$('empty'), run:$('run'), saveAll:$('saveAll'), share:$('share'),
-  clear:$('clear'), msg:$('msg'), meter:$('meter'), bar:$('meterbar'), count:$('count'), model:$('model'), bg:$('bg'), color:$('color'), fmt:$('fmt'), maxdim:$('maxdim') };
+  clear:$('clear'), msg:$('msg'), meter:$('meter'), bar:$('meterbar'), count:$('count'), model:$('model'), device:$('device'), bg:$('bg'), color:$('color'), fmt:$('fmt'), maxdim:$('maxdim') };
 
 const items = [];   // {id,file,name,status,input,inputURL,w,h,fg,out,outURL,err,el}
-let busy = false, uid = 0, libMod = null, heicLoaded = null, useGPU = !!navigator.gpu;
+let busy = false, uid = 0, libMod = null, heicLoaded = null;
 
 /* ---------- helpers ---------- */
 function toast(t){ const d=document.createElement('div'); d.className='toast'; d.textContent=t; document.body.appendChild(d); setTimeout(()=>d.remove(),2600); }
@@ -353,10 +360,38 @@ async function getLib(){
   if (!libMod){ els.msg.textContent='Đang tải bộ xử lý AI…'; libMod = await import(LIB); }
   return libMod.removeBackground || libMod.default;
 }
+/* True if the cut-out has almost no visible pixels (empty mask) */
+async function isEmpty(blob){
+  const img = await loadImg(blob);
+  const s = Math.min(1, 256/Math.max(img.naturalWidth,img.naturalHeight));
+  const w=Math.max(1,Math.round(img.naturalWidth*s)), h=Math.max(1,Math.round(img.naturalHeight*s));
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const g=c.getContext('2d',{willReadFrequently:true}); g.drawImage(img,0,0,w,h);
+  const d=g.getImageData(0,0,w,h).data; let vis=0;
+  for (let i=3;i<d.length;i+=4) if (d[i]>24) vis++;
+  return vis < (w*h)*0.002;
+}
 async function cut(removeBackground, blob){
+  const tries = [];
+  const want = els.device.value==='gpu' && !!navigator.gpu;
+  if (want) tries.push({device:'gpu', model:els.model.value});
+  tries.push({device:'cpu', model:els.model.value});
+  if (els.model.value!=='isnet') tries.push({device:'cpu', model:'isnet'});
+  let lastErr = null;
+  for (const t of tries){
+    try{
+      const r = await runOnce(removeBackground, blob, t);
+      if (!(await isEmpty(r))) return r;
+      console.warn('Empty mask with', t);
+      lastErr = new Error('Không nhận ra được chủ thể trong ảnh');
+    }catch(e){ console.error(e); lastErr = e; }
+  }
+  throw lastErr;
+}
+async function runOnce(removeBackground, blob, t){
   const config = {
-    model: els.model.value,
-    device: useGPU ? 'gpu' : 'cpu',
+    model: t.model,
+    device: t.device,
     output: { format:'image/png', type:'foreground' },
     progress: (key, cur, total) => {
       if (/fetch|model|wasm|onnx/i.test(key) && total){
@@ -365,8 +400,7 @@ async function cut(removeBackground, blob){
       }
     }
   };
-  try { return await removeBackground(blob, config); }
-  catch(e){ if (useGPU){ useGPU=false; config.device='cpu'; return await removeBackground(blob, config); } throw e; }
+  return await removeBackground(blob, config);
 }
 els.run.onclick = async () => {
   if (busy) return;
