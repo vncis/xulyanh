@@ -136,6 +136,14 @@ button.ghost{background:transparent}
 
   <div class="bar">
     <div class="field">
+      <label for="engine">Bộ máy AI</label>
+      <select id="engine">
+        <option value="auto" selected>Tự động</option>
+        <option value="imgly">IMG.LY ISNet (PC)</option>
+        <option value="rmbg">BRIA RMBG-1.4 (iPhone)</option>
+      </select>
+    </div>
+    <div class="field">
       <label for="model">Chất lượng</label>
       <select id="model">
         <option value="isnet">Cao nhất (tải ~170 MB lần đầu)</option>
@@ -212,7 +220,7 @@ const HEIC_LIB = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.
 
 const $ = id => document.getElementById(id);
 const els = { drop:$('drop'), file:$('file'), grid:$('grid'), empty:$('empty'), run:$('run'), saveAll:$('saveAll'), share:$('share'),
-  clear:$('clear'), msg:$('msg'), meter:$('meter'), bar:$('meterbar'), count:$('count'), model:$('model'), device:$('device'), bg:$('bg'), color:$('color'), fmt:$('fmt'), maxdim:$('maxdim') };
+  clear:$('clear'), msg:$('msg'), meter:$('meter'), bar:$('meterbar'), count:$('count'), model:$('model'), engine:$('engine'), device:$('device'), bg:$('bg'), color:$('color'), fmt:$('fmt'), maxdim:$('maxdim') };
 
 const items = [];   // {id,file,name,status,input,inputURL,w,h,fg,out,outURL,err,el}
 let busy = false, uid = 0, libMod = null, heicLoaded = null;
@@ -401,10 +409,63 @@ async function applyMask(fullBlob, smallFg){
   g.drawImage(fg,0,0,c.width,c.height);
   return canvasToBlob(c,'image/png');
 }
-async function cut(removeBackground, blob){
+function engineFor(){ const e=els.engine.value; return e==='auto' ? (IS_IOS ? 'rmbg' : 'imgly') : e; }
+async function cut(_, blob){
   const small = await shrink(blob);
-  const fg = await cutSmall(removeBackground, small);
+  let fg;
+  if (engineFor()==='rmbg') fg = await rmbgCut(small);
+  else {
+    try { fg = await cutSmall(await getLib(), small); }
+    catch(e){ console.warn('IMG.LY failed, switching to RMBG', e); els.msg.textContent='Chuyển sang bộ máy AI dự phòng…'; fg = await rmbgCut(small); }
+  }
   return applyMask(blob, fg);
+}
+
+/* ---- Engine 2: BRIA RMBG-1.4 via Transformers.js 2.x (older ONNX runtime that works on iPhone Safari) ---- */
+const TJS = 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+let rmbgP = null;
+function loadRmbg(){
+  return rmbgP ||= (async () => {
+    els.msg.textContent='Đang tải bộ máy AI…';
+    const T = await import(TJS);
+    T.env.allowLocalModels = false;
+    T.env.backends.onnx.wasm.numThreads = 1;
+    const files = {};
+    const progress_callback = p => {
+      if (p.status==='progress' && p.total){
+        files[p.file] = [p.loaded, p.total];
+        const [l,t] = Object.values(files).reduce((a,[x,y])=>[a[0]+x,a[1]+y],[0,0]);
+        const pc = Math.round(l/t*100);
+        els.meter.hidden=false; els.bar.style.width=pc+'%';
+        els.msg.textContent = pc<100 ? `Đang tải mô hình AI (lần đầu)… ${pc}%` : 'Đã tải xong mô hình, AI đang phân tích ảnh…';
+      }
+    };
+    const model = await T.AutoModel.from_pretrained('briaai/RMBG-1.4', { config:{ model_type:'custom' }, quantized:true, progress_callback });
+    const processor = await T.AutoProcessor.from_pretrained('briaai/RMBG-1.4', { config:{
+      do_normalize:true, do_pad:false, do_rescale:true, do_resize:true,
+      image_mean:[0.5,0.5,0.5], feature_extractor_type:'ImageFeatureExtractor',
+      image_std:[1,1,1], resample:2, rescale_factor:0.00392156862745098,
+      size:{ width:1024, height:1024 } } });
+    return { T, model, processor };
+  })().catch(e => { rmbgP=null; throw e; });
+}
+async function rmbgCut(smallBlob){
+  const { T, model, processor } = await loadRmbg();
+  els.msg.textContent='AI đang phân tích ảnh…';
+  const url = URL.createObjectURL(smallBlob);
+  let image; try { image = await T.RawImage.fromURL(url); } finally { URL.revokeObjectURL(url); }
+  const { pixel_values } = await processor(image);
+  const { output } = await model({ input: pixel_values });
+  const mask = await T.RawImage.fromTensor(output[0].mul(255).to('uint8')).resize(image.width, image.height);
+  const img = await loadImg(smallBlob);
+  const c=document.createElement('canvas'); c.width=image.width; c.height=image.height;
+  const g=c.getContext('2d',{willReadFrequently:true}); g.drawImage(img,0,0,c.width,c.height);
+  const d=g.getImageData(0,0,c.width,c.height), px=d.data, m=mask.data, ch=mask.channels||1;
+  for (let i=0,j=0;i<px.length;i+=4,j+=ch) px[i+3]=m[j];
+  g.putImageData(d,0,0);
+  const out = await canvasToBlob(c,'image/png');
+  if (await isEmpty(out)) throw new Error('Không nhận ra được chủ thể trong ảnh');
+  return out;
 }
 async function cutSmall(removeBackground, blob){
   const tries = [], m = els.model.value;
@@ -444,9 +505,7 @@ els.run.onclick = async () => {
   const queue = items.filter(i=>i.status==='ready'||(i.status==='error'&&i.input));
   if (!queue.length) return;
   busy=true; refresh();
-  let removeBackground;
-  try { removeBackground = await getLib(); }
-  catch(e){ busy=false; refresh(); els.msg.textContent='Không tải được bộ xử lý AI. Kiểm tra kết nối mạng rồi thử lại.'; return; }
+  const removeBackground = null;
   let k=0;
   for (const it of queue){
     if (!items.includes(it)) continue;
