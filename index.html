@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#eef1f5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Tách Nền Ảnh</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one working column — drop zone + settings bar on top, result grid below; checkerboard (transparency) is the visual motif */
+:root{
+  --bg:#eef1f5; --surface:#ffffff; --ink:#151a24; --muted:#5d6676; --line:#d6dbe4;
+  --accent:#2747d6; --accent-ink:#ffffff; --accent-soft:#e3e8fc;
+  --ok:#16794a; --ok-soft:#dcf2e6; --warn:#a15c00; --warn-soft:#fbecd6; --bad:#b4232c; --bad-soft:#fbe0e2;
+  --chk-a:#ffffff; --chk-b:#e4e8ef;
+  --f-ui:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#0f131a; --surface:#181d27; --ink:#e8ecf3; --muted:#97a1b3; --line:#2a3240;
+    --accent:#7d95ff; --accent-ink:#0b1022; --accent-soft:#1f2a52;
+    --ok:#5fd39a; --ok-soft:#133526; --warn:#f2b25c; --warn-soft:#3a2a12; --bad:#ff7b84; --bad-soft:#3d1a1e;
+    --chk-a:#2a303c; --chk-b:#20252f; color-scheme:dark; }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-ui);-webkit-font-smoothing:antialiased;
+  padding:env(safe-area-inset-top,0px) max(16px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) max(16px,env(safe-area-inset-left,0px));}
+.wrap{max-width:1180px;margin:0 auto;padding-block:28px 64px;display:flex;flex-direction:column;gap:20px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:14px}
+.logo{width:46px;height:46px;border-radius:12px;flex:none;
+  background:conic-gradient(var(--chk-b) 25%,var(--chk-a) 0 50%,var(--chk-b) 0 75%,var(--chk-a) 0) 0 0/14px 14px;
+  border:1px solid var(--line);position:relative;overflow:hidden}
+.logo::after{content:"";position:absolute;inset:9px 9px 9px 9px;border-radius:50% 50% 8px 8px;background:var(--accent)}
+h1{margin:0;font-size:clamp(24px,4vw,32px);font-weight:800;letter-spacing:-.02em;text-wrap:balance;line-height:1.1}
+.sub{margin:4px 0 0;color:var(--muted);font-size:14px}
+.privacy{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.privacy b{color:var(--ok);font-weight:600}
+
+.drop{border:2px dashed var(--line);border-radius:var(--r);background:var(--surface);padding:28px 20px;
+  display:grid;place-items:center;text-align:center;gap:10px;cursor:pointer;transition:border-color .15s,background .15s}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.drop strong{font-size:18px}
+.drop .hint{color:var(--muted);font-size:13px;max-width:60ch}
+.fmts{font-family:var(--f-mono);font-size:12px;color:var(--muted);letter-spacing:.02em}
+
+.bar{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-end;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+select,input[type=color]{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-height:40px}
+input[type=color]{width:46px;padding:4px;cursor:pointer}
+.bgset{display:flex;gap:8px;align-items:center}
+.spacer{flex:1 1 0}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+button{font:inherit;font-weight:600;font-size:14px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);
+  padding:9px 14px;min-height:40px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:background .15s,border-color .15s}
+button:hover:not(:disabled){border-color:var(--accent)}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button.primary:hover:not(:disabled){filter:brightness(1.08)}
+button.ghost{background:transparent}
+
+.status{display:flex;align-items:center;gap:12px;font-size:14px;color:var(--muted);min-height:22px;flex-wrap:wrap}
+.meter{flex:1 1 220px;max-width:420px;height:6px;border-radius:99px;background:var(--line);overflow:hidden}
+.meter i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.count{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:13px}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.stage{position:relative;aspect-ratio:1/1;max-width:100%;
+  background:conic-gradient(var(--chk-b) 25%,var(--chk-a) 0 50%,var(--chk-b) 0 75%,var(--chk-a) 0) 0 0/18px 18px;
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.stage img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none}
+.stage .orig{opacity:0;transition:opacity .12s}
+.stage.peek .orig{opacity:1}
+.stage .ph{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:13px}
+.pill{position:absolute;top:10px;left:10px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px;background:var(--surface);color:var(--muted);border:1px solid var(--line)}
+.pill.run{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.pill.ok{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.pill.bad{background:var(--bad-soft);color:var(--bad);border-color:transparent}
+.spin{position:absolute;inset:0;display:grid;place-items:center;background:color-mix(in srgb,var(--surface) 55%,transparent)}
+.spin::after{content:"";width:34px;height:34px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:sp 0.8s linear infinite}
+@keyframes sp{to{transform:rotate(1turn)}}
+@media (prefers-reduced-motion:reduce){.spin::after{animation-duration:3s}}
+.meta{padding:10px 12px 0;display:flex;flex-direction:column;gap:2px;min-width:0}
+.name{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dims{font-family:var(--f-mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.err{color:var(--bad);font-size:12px}
+.cardact{display:flex;gap:6px;padding:10px 12px 12px;flex-wrap:wrap}
+.cardact button{padding:7px 10px;min-height:36px;font-size:13px}
+.cardact .grow{flex:1 1 auto;justify-content:center}
+
+.empty{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:22px 20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px}
+.step{display:flex;gap:12px;align-items:flex-start}
+.step .n{flex:none;width:28px;height:28px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-weight:700;display:grid;place-items:center;font-size:14px}
+.step p{margin:0;font-size:14px;color:var(--muted)}
+.step strong{display:block;color:var(--ink);font-size:15px}
+.note{font-size:12.5px;color:var(--muted);max-width:75ch;margin:0}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);
+  padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px);box-shadow:0 8px 24px rgba(0,0,0,.25)}
+@media (max-width:560px){
+  .bar{padding:12px}
+  .actions{width:100%}
+  .actions button{flex:1 1 calc(50% - 8px);justify-content:center}
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .cardact button{flex:1 1 auto;justify-content:center}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <h1>Tách Nền Ảnh</h1>
+        <p class="sub">Xoá phông bằng AI, xử lý nhiều ảnh một lúc, tải về PNG trong suốt.</p>
+      </div>
+    </div>
+    <div class="privacy">🔒 <span>Ảnh được xử lý <b>ngay trên máy bạn</b>, không gửi lên máy chủ</span></div>
+  </header>
+
+  <div class="drop" id="drop" tabindex="0" role="button" aria-label="Chọn ảnh">
+    <strong>Bấm để chọn ảnh, hoặc kéo thả vào đây</strong>
+    <span class="hint">Chọn được nhiều ảnh cùng lúc. Trên điện thoại có thể chọn từ Thư viện ảnh hoặc chụp mới. Có thể dán ảnh (Ctrl+V).</span>
+    <span class="fmts">JPG · PNG · WEBP · HEIC/HEIF · AVIF · GIF · BMP · TIFF*</span>
+    <input type="file" id="file" accept="image/*,.heic,.heif,.avif,.tif,.tiff,.bmp" multiple hidden>
+  </div>
+
+  <div class="bar">
+    <div class="field">
+      <label for="model">Chất lượng</label>
+      <select id="model">
+        <option value="isnet">Cao nhất (tải ~170 MB lần đầu)</option>
+        <option value="isnet_fp16" selected>Cân bằng (~80 MB)</option>
+        <option value="isnet_quint8">Nhanh (~40 MB)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="bg">Nền mới</label>
+      <div class="bgset">
+        <select id="bg">
+          <option value="transparent" selected>Trong suốt</option>
+          <option value="#ffffff">Trắng</option>
+          <option value="#000000">Đen</option>
+          <option value="custom">Màu tuỳ chọn</option>
+        </select>
+        <input type="color" id="color" value="#2747d6" aria-label="Chọn màu nền" hidden>
+      </div>
+    </div>
+    <div class="field">
+      <label for="fmt">Định dạng lưu</label>
+      <select id="fmt">
+        <option value="image/png" selected>PNG</option>
+        <option value="image/webp">WEBP</option>
+        <option value="image/jpeg">JPG</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="maxdim">Kích thước tối đa</label>
+      <select id="maxdim">
+        <option value="0">Giữ nguyên</option>
+        <option value="4096" selected>4096 px</option>
+        <option value="2048">2048 px</option>
+        <option value="1280">1280 px</option>
+      </select>
+    </div>
+    <div class="spacer"></div>
+    <div class="actions">
+      <button class="primary" id="run" disabled>Xoá nền</button>
+      <button id="saveAll" disabled>Tải tất cả</button>
+      <button id="share" disabled hidden>Lưu vào Ảnh</button>
+      <button class="ghost" id="clear" disabled>Xoá danh sách</button>
+    </div>
+  </div>
+
+  <div class="status" aria-live="polite">
+    <span id="msg">Chưa có ảnh nào.</span>
+    <div class="meter" id="meter" hidden><i id="meterbar"></i></div>
+    <span class="count" id="count"></span>
+  </div>
+
+  <div class="empty" id="empty">
+    <div class="step"><span class="n">1</span><p><strong>Chọn ảnh</strong>Một hoặc nhiều ảnh, nhiều định dạng khác nhau.</p></div>
+    <div class="step"><span class="n">2</span><p><strong>Bấm “Xoá nền”</strong>Lần đầu cần tải mô hình AI (một lần, sau đó trình duyệt nhớ).</p></div>
+    <div class="step"><span class="n">3</span><p><strong>Lưu kết quả</strong>Tải từng ảnh, tải tất cả (ZIP), hoặc lưu vào Ảnh trên điện thoại.</p></div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <p class="note">Mẹo: giữ ngón tay (hoặc chuột) lên một ảnh để xem lại ảnh gốc. Đổi nền hoặc định dạng sau khi xử lý không cần chạy lại AI. *TIFF chỉ mở được trên Safari. Ảnh rất lớn trên điện thoại nên giới hạn 2048–4096 px để tránh hết bộ nhớ.</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script type="module">
+const LIB = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/+esm';
+const HEIC_LIB = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
+
+const $ = id => document.getElementById(id);
+const els = { drop:$('drop'), file:$('file'), grid:$('grid'), empty:$('empty'), run:$('run'), saveAll:$('saveAll'), share:$('share'),
+  clear:$('clear'), msg:$('msg'), meter:$('meter'), bar:$('meterbar'), count:$('count'), model:$('model'), bg:$('bg'), color:$('color'), fmt:$('fmt'), maxdim:$('maxdim') };
+
+const items = [];   // {id,file,name,status,input,inputURL,w,h,fg,out,outURL,err,el}
+let busy = false, uid = 0, libMod = null, heicLoaded = null, useGPU = !!navigator.gpu;
+
+/* ---------- helpers ---------- */
+function toast(t){ const d=document.createElement('div'); d.className='toast'; d.textContent=t; document.body.appendChild(d); setTimeout(()=>d.remove(),2600); }
+const extOf = n => (n.split('.').pop()||'').toLowerCase();
+const baseOf = n => n.replace(/\.[^.]+$/,'') || 'anh';
+const extFor = t => ({'image/png':'png','image/webp':'webp','image/jpeg':'jpg'})[t];
+function canvasToBlob(c,type,q){ return new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(new Error('Không xuất được ảnh')),type,q)); }
+async function loadImg(blob){
+  const url = URL.createObjectURL(blob);
+  try{ const img=new Image(); img.src=url; await img.decode(); return img; }
+  finally{ setTimeout(()=>URL.revokeObjectURL(url),0); }
+}
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('Không tải được thư viện HEIC')); document.head.appendChild(s); }); }
+const isHeic = f => /heic|heif/i.test(f.type) || ['heic','heif'].includes(extOf(f.name));
+
+/* Decode any supported file into a PNG blob (respecting max size + EXIF orientation) */
+async function normalize(file, maxDim){
+  let img;
+  try { img = await loadImg(file); }
+  catch(e){
+    if (!isHeic(file)) throw new Error('Trình duyệt này không đọc được định dạng ảnh này');
+    heicLoaded ||= loadScript(HEIC_LIB);
+    await heicLoaded;
+    let png = await window.heic2any({ blob:file, toType:'image/png' });
+    if (Array.isArray(png)) png = png[0];
+    img = await loadImg(png);
+  }
+  let w = img.naturalWidth, h = img.naturalHeight;
+  if (maxDim && Math.max(w,h) > maxDim){ const s = maxDim/Math.max(w,h); w=Math.round(w*s); h=Math.round(h*s); }
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  c.getContext('2d').drawImage(img,0,0,w,h);
+  return { blob: await canvasToBlob(c,'image/png'), w, h };
+}
+
+/* Composite the cut-out onto the chosen background and encode */
+function bgValue(){ const v=els.bg.value; return v==='custom' ? els.color.value : v; }
+async function composite(fg){
+  const type = els.fmt.value; let bg = bgValue();
+  if (type==='image/jpeg' && bg==='transparent') bg = '#ffffff';
+  if (type==='image/png' && bg==='transparent') return fg;
+  const img = await loadImg(fg);
+  const c=document.createElement('canvas'); c.width=img.naturalWidth; c.height=img.naturalHeight;
+  const g=c.getContext('2d');
+  if (bg!=='transparent'){ g.fillStyle=bg; g.fillRect(0,0,c.width,c.height); }
+  g.drawImage(img,0,0);
+  return canvasToBlob(c,type, type==='image/png'?undefined:0.95);
+}
+const outName = it => `${baseOf(it.name)}-tachnen.${extFor(els.fmt.value)}`;
+
+/* ---------- rendering ---------- */
+function card(it){
+  const el=document.createElement('div'); el.className='card';
+  el.innerHTML = `
+    <div class="stage">
+      <div class="ph">Đang đọc ảnh…</div>
+      <img class="res" alt="">
+      <img class="orig" alt="">
+      <span class="pill"></span>
+    </div>
+    <div class="meta"><span class="name"></span><span class="dims"></span><span class="err" hidden></span></div>
+    <div class="cardact">
+      <button class="grow dl" disabled>Tải về</button>
+      <button class="rm" aria-label="Bỏ ảnh này">✕</button>
+    </div>`;
+  el.querySelector('.name').textContent = it.name; el.querySelector('.name').title = it.name;
+  const stage = el.querySelector('.stage');
+  const peekOn = e => { if (it.outURL){ e.preventDefault(); stage.classList.add('peek'); } };
+  const peekOff = () => stage.classList.remove('peek');
+  stage.addEventListener('pointerdown', peekOn); ['pointerup','pointerleave','pointercancel'].forEach(t=>stage.addEventListener(t,peekOff));
+  stage.addEventListener('contextmenu', e=>e.preventDefault());
+  el.querySelector('.dl').onclick = () => saveOne(it);
+  el.querySelector('.rm').onclick = () => removeItem(it);
+  it.el = el; return el;
+}
+function paint(it){
+  const el=it.el; if(!el) return;
+  const pill=el.querySelector('.pill'), stage=el.querySelector('.stage');
+  const map = { reading:['Đang đọc',''], ready:['Chờ xử lý',''], run:['Đang xoá nền','run'], done:['Xong','ok'], error:['Lỗi','bad'] };
+  const [t,c]=map[it.status]; pill.textContent=t; pill.className='pill '+c;
+  el.querySelector('.ph').hidden = !!it.inputURL;
+  const orig=el.querySelector('.orig'), res=el.querySelector('.res');
+  if (it.inputURL && orig.src!==it.inputURL) orig.src=it.inputURL;
+  if (it.outURL){ if(res.src!==it.outURL) res.src=it.outURL; orig.style.opacity=''; }
+  else if (it.inputURL){ res.removeAttribute('src'); orig.style.opacity='1'; }
+  let sp=stage.querySelector('.spin');
+  if (it.status==='run' && !sp){ sp=document.createElement('div'); sp.className='spin'; stage.appendChild(sp); }
+  if (it.status!=='run' && sp) sp.remove();
+  el.querySelector('.dims').textContent = it.w ? `${it.w} × ${it.h} px` : '';
+  const er=el.querySelector('.err'); er.hidden=!it.err; er.textContent=it.err||'';
+  el.querySelector('.dl').disabled = !it.out;
+}
+function refresh(){
+  const n=items.length, done=items.filter(i=>i.status==='done').length, todo=items.filter(i=>i.status==='ready'||i.status==='error').length;
+  els.empty.hidden = n>0;
+  els.run.disabled = busy || todo===0;
+  els.run.textContent = busy ? 'Đang xử lý…' : (todo && done ? `Xoá nền (${todo} ảnh còn lại)` : 'Xoá nền');
+  els.saveAll.disabled = busy || done===0;
+  els.saveAll.textContent = done>1 ? `Tải tất cả (${done}, ZIP)` : 'Tải về';
+  els.clear.disabled = busy || n===0;
+  els.share.hidden = !canShareFiles();
+  els.share.disabled = busy || done===0;
+  els.count.textContent = n ? `${done}/${n} xong` : '';
+  if (!busy) els.msg.textContent = n===0 ? 'Chưa có ảnh nào.' : (todo ? `${todo} ảnh đang chờ. Bấm “Xoá nền” để bắt đầu.` : 'Đã xử lý xong tất cả.');
+}
+
+/* ---------- adding files ---------- */
+async function addFiles(list){
+  const files=[...list].filter(f => f.type.startsWith('image/') || /^(heic|heif|avif|tif|tiff|bmp)$/.test(extOf(f.name)));
+  if (!files.length){ toast('Không có tệp ảnh nào hợp lệ'); return; }
+  const maxDim=+els.maxdim.value;
+  const fresh = files.map(f => ({ id:++uid, file:f, name:f.name||`anh-${uid}.png`, status:'reading' }));
+  fresh.forEach(it=>{ items.push(it); els.grid.appendChild(card(it)); paint(it); });
+  refresh();
+  for (const it of fresh){
+    try{
+      const n = await normalize(it.file, maxDim);
+      Object.assign(it,{ input:n.blob, w:n.w, h:n.h, inputURL:URL.createObjectURL(n.blob), status:'ready' });
+    }catch(e){ it.status='error'; it.err=e.message; }
+    if (items.includes(it)) paint(it);
+    refresh();
+  }
+}
+els.drop.onclick = () => els.file.click();
+els.drop.onkeydown = e => { if(e.key==='Enter'||e.key===' '){ e.preventDefault(); els.file.click(); } };
+els.file.onchange = () => { addFiles(els.file.files); els.file.value=''; };
+['dragenter','dragover'].forEach(t=>els.drop.addEventListener(t,e=>{e.preventDefault(); els.drop.classList.add('over');}));
+['dragleave','drop'].forEach(t=>els.drop.addEventListener(t,e=>{e.preventDefault(); els.drop.classList.remove('over');}));
+els.drop.addEventListener('drop', e => addFiles(e.dataTransfer.files));
+window.addEventListener('dragover', e=>e.preventDefault());
+window.addEventListener('drop', e=>{ e.preventDefault(); if(e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files); });
+window.addEventListener('paste', e => { const f=[...(e.clipboardData?.files||[])]; if(f.length) addFiles(f); });
+
+function removeItem(it){
+  if (it.status==='run') return;
+  const i=items.indexOf(it); if(i>=0) items.splice(i,1);
+  it.el?.remove(); [it.inputURL,it.outURL].forEach(u=>u&&URL.revokeObjectURL(u)); refresh();
+}
+els.clear.onclick = () => { [...items].forEach(removeItem); };
+
+/* ---------- processing ---------- */
+async function getLib(){
+  if (!libMod){ els.msg.textContent='Đang tải bộ xử lý AI…'; libMod = await import(LIB); }
+  return libMod.removeBackground || libMod.default;
+}
+async function cut(removeBackground, blob){
+  const config = {
+    model: els.model.value,
+    device: useGPU ? 'gpu' : 'cpu',
+    output: { format:'image/png', type:'foreground' },
+    progress: (key, cur, total) => {
+      if (/fetch|model|wasm|onnx/i.test(key) && total){
+        els.meter.hidden=false; els.bar.style.width = Math.round(cur/total*100)+'%';
+        els.msg.textContent = `Đang tải mô hình AI (lần đầu)… ${Math.round(cur/total*100)}%`;
+      }
+    }
+  };
+  try { return await removeBackground(blob, config); }
+  catch(e){ if (useGPU){ useGPU=false; config.device='cpu'; return await removeBackground(blob, config); } throw e; }
+}
+els.run.onclick = async () => {
+  if (busy) return;
+  const queue = items.filter(i=>i.status==='ready'||(i.status==='error'&&i.input));
+  if (!queue.length) return;
+  busy=true; refresh();
+  let removeBackground;
+  try { removeBackground = await getLib(); }
+  catch(e){ busy=false; refresh(); els.msg.textContent='Không tải được bộ xử lý AI. Kiểm tra kết nối mạng rồi thử lại.'; return; }
+  let k=0;
+  for (const it of queue){
+    if (!items.includes(it)) continue;
+    k++; it.status='run'; it.err=''; paint(it); refresh();
+    els.msg.textContent = `Đang xoá nền ảnh ${k}/${queue.length}: ${it.name}`;
+    try{
+      it.fg = await cut(removeBackground, it.input);
+      await rerender(it);
+      it.status='done';
+    }catch(e){ console.error(e); it.status='error'; it.err='Xử lý thất bại: '+(e.message||e); }
+    els.meter.hidden=false; els.bar.style.width = Math.round(k/queue.length*100)+'%';
+    els.msg.textContent = `Đang xoá nền ảnh ${Math.min(k+1,queue.length)}/${queue.length}`;
+    paint(it); refresh();
+  }
+  busy=false; els.meter.hidden=true; refresh();
+  toast('Xong! Bấm “Tải về” để lưu ảnh.');
+};
+async function rerender(it){
+  it.out = await composite(it.fg);
+  if (it.outURL) URL.revokeObjectURL(it.outURL);
+  it.outURL = URL.createObjectURL(it.out);
+}
+async function rerenderAll(){
+  for (const it of items) if (it.fg){ await rerender(it); paint(it); }
+}
+els.bg.onchange = () => { els.color.hidden = els.bg.value!=='custom'; rerenderAll(); };
+els.color.oninput = () => rerenderAll();
+els.fmt.onchange = () => rerenderAll();
+
+/* ---------- saving ---------- */
+function download(blob,name){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+}
+function saveOne(it){ if (it.out) download(it.out, outName(it)); }
+els.saveAll.onclick = async () => {
+  const done=items.filter(i=>i.out);
+  if (done.length===1) return saveOne(done[0]);
+  els.msg.textContent='Đang nén ZIP…';
+  const zip=new JSZip(), used=new Set();
+  for (const it of done){
+    let n=outName(it), i=2; while(used.has(n)){ n=outName(it).replace(/(\.\w+)$/,`-${i++}$1`); } used.add(n);
+    zip.file(n, it.out);
+  }
+  const blob = await zip.generateAsync({type:'blob', compression:'STORE'});
+  download(blob, `tach-nen-${new Date().toISOString().slice(0,10)}.zip`);
+  refresh();
+};
+function canShareFiles(){
+  try{ return !!(navigator.canShare && navigator.canShare({ files:[new File([new Blob(['x'],{type:'image/png'})],'t.png',{type:'image/png'})] })); }catch{ return false; }
+}
+els.share.onclick = async () => {
+  const files = items.filter(i=>i.out).map(i=>new File([i.out], outName(i), {type:i.out.type}));
+  try{ await navigator.share({ files }); }
+  catch(e){ if (e.name!=='AbortError') toast('Không chia sẻ được, hãy dùng nút “Tải về”.'); }
+};
+refresh();
+</script>
+</body>
+</html>
