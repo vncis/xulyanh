@@ -217,6 +217,15 @@ const els = { drop:$('drop'), file:$('file'), grid:$('grid'), empty:$('empty'), 
 const items = [];   // {id,file,name,status,input,inputURL,w,h,fg,out,outURL,err,el}
 let busy = false, uid = 0, libMod = null, heicLoaded = null;
 
+/* Phones (esp. iPhone Safari) have little memory for WebAssembly: use the light model + smaller images by default */
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+const IS_MOBILE = IS_IOS || /Android|Mobi/i.test(navigator.userAgent);
+if (IS_MOBILE){
+  els.model.value = 'isnet_quint8';
+  els.model.querySelector('option[value="isnet"]').disabled = true;   // ~170 MB model does not fit in phone memory
+  els.maxdim.value = '2048';
+}
+
 /* ---------- helpers ---------- */
 function toast(t){ const d=document.createElement('div'); d.className='toast'; d.textContent=t; document.body.appendChild(d); setTimeout(()=>d.remove(),2600); }
 const extOf = n => (n.split('.').pop()||'').toLowerCase();
@@ -371,12 +380,39 @@ async function isEmpty(blob){
   for (let i=3;i<d.length;i+=4) if (d[i]>24) vis++;
   return vis < (w*h)*0.002;
 }
+/* The AI model works at 1024 px anyway: feed it a small copy (saves lots of memory on phones),
+   then scale its cut-out up and use it as a mask on the full-size image. */
+const MODEL_SIDE = 1024;
+async function shrink(blob){
+  const img = await loadImg(blob);
+  const W=img.naturalWidth, H=img.naturalHeight, s=Math.min(1, MODEL_SIDE/Math.max(W,H));
+  if (s===1) return blob;
+  const c=document.createElement('canvas'); c.width=Math.round(W*s); c.height=Math.round(H*s);
+  const g=c.getContext('2d'); g.imageSmoothingQuality='high'; g.drawImage(img,0,0,c.width,c.height);
+  return canvasToBlob(c,'image/png');
+}
+async function applyMask(fullBlob, smallFg){
+  const [full, fg] = await Promise.all([loadImg(fullBlob), loadImg(smallFg)]);
+  const c=document.createElement('canvas'); c.width=full.naturalWidth; c.height=full.naturalHeight;
+  const g=c.getContext('2d');
+  g.drawImage(full,0,0);
+  g.globalCompositeOperation='destination-in';
+  g.imageSmoothingQuality='high';
+  g.drawImage(fg,0,0,c.width,c.height);
+  return canvasToBlob(c,'image/png');
+}
 async function cut(removeBackground, blob){
-  const tries = [];
+  const small = await shrink(blob);
+  const fg = await cutSmall(removeBackground, small);
+  return applyMask(blob, fg);
+}
+async function cutSmall(removeBackground, blob){
+  const tries = [], m = els.model.value;
   const want = els.device.value==='gpu' && !!navigator.gpu;
-  if (want) tries.push({device:'gpu', model:els.model.value});
-  tries.push({device:'cpu', model:els.model.value});
-  if (els.model.value!=='isnet') tries.push({device:'cpu', model:'isnet'});
+  if (want) tries.push({device:'gpu', model:m});
+  tries.push({device:'cpu', model:m});
+  if (IS_MOBILE){ if (m!=='isnet_quint8') tries.push({device:'cpu', model:'isnet_quint8'}); }   // phones: only fall back to a smaller model
+  else if (m!=='isnet') tries.push({device:'cpu', model:'isnet'});
   let lastErr = null;
   for (const t of tries){
     try{
@@ -396,7 +432,8 @@ async function runOnce(removeBackground, blob, t){
     progress: (key, cur, total) => {
       if (/fetch|model|wasm|onnx/i.test(key) && total){
         els.meter.hidden=false; els.bar.style.width = Math.round(cur/total*100)+'%';
-        els.msg.textContent = `Đang tải mô hình AI (lần đầu)… ${Math.round(cur/total*100)}%`;
+        const p = Math.round(cur/total*100);
+        els.msg.textContent = p<100 ? `Đang tải mô hình AI (lần đầu)… ${p}%` : `Đã tải xong mô hình, AI đang phân tích ảnh…`;
       }
     }
   };
