@@ -27,6 +27,7 @@
     --chk-a:#2a303c; --chk-b:#20252f; color-scheme:dark; }
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-ui);-webkit-font-smoothing:antialiased;
   padding:env(safe-area-inset-top,0px) max(16px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) max(16px,env(safe-area-inset-left,0px));}
@@ -111,6 +112,44 @@ button.ghost{background:transparent}
   .actions button{flex:1 1 calc(50% - 8px);justify-content:center}
   .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
   .cardact button{flex:1 1 auto;justify-content:center}
+}
+
+/* ---------- Manual editor ---------- */
+.ed-modal{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column}
+.ed-top{display:flex;align-items:center;gap:10px;background:var(--surface);border-bottom:1px solid var(--line);
+  padding-top:calc(10px + env(safe-area-inset-top,0px));padding-bottom:10px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.ed-title{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;text-align:center}
+.ed-eyebrow{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.ed-name{font-weight:600;font-size:14px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ed-area{flex:1 1 auto;position:relative;min-height:0;overflow:hidden;background:var(--bg)}
+.ed-area canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.ed-zoom{position:absolute;right:max(12px,env(safe-area-inset-right,0px));bottom:12px;display:flex;gap:6px}
+.ed-zoom button{min-height:38px;min-width:38px;justify-content:center;padding:6px 10px;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.ed-busy{position:absolute;inset:0;display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center;
+  background:color-mix(in srgb,var(--bg) 70%,transparent);font-weight:600;text-align:center;padding:16px}
+.ed-busy::before{content:"";width:38px;height:38px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:sp .8s linear infinite}
+.ed-tools{background:var(--surface);border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;
+  padding-top:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.seg{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:4px}
+.seg button{border:0;background:transparent;min-height:48px;padding:5px 10px;font-size:12px;font-weight:600;flex-direction:column;gap:2px;justify-content:center;color:var(--muted)}
+.seg button svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.opts{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-size:13px;color:var(--muted)}
+.opts select{min-height:36px;padding:6px 8px;font-size:13px}
+.chk{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.chk input{width:18px;height:18px;accent-color:var(--accent)}
+input[type=range]{accent-color:var(--accent);width:140px}
+.ed-hist{display:flex;gap:6px}
+.ed-hist button{min-height:36px;padding:6px 10px;font-size:13px}
+.ed-hint{margin:0;font-size:12.5px;color:var(--muted);flex:1 1 240px}
+@media (max-width:640px){
+  .seg{width:100%}
+  .seg button{padding:5px 2px;font-size:11px}
+  .ed-tools{gap:8px 12px}
+  .ed-hint{display:none}
 }
 </style>
 </head>
@@ -213,12 +252,57 @@ button.ghost{background:transparent}
   <div class="empty" id="empty">
     <div class="step"><span class="n">1</span><p><strong>Chọn ảnh</strong>Một hoặc nhiều ảnh, nhiều định dạng khác nhau.</p></div>
     <div class="step"><span class="n">2</span><p><strong>Bấm “Xoá nền”</strong>Lần đầu cần tải mô hình AI (một lần, sau đó trình duyệt nhớ).</p></div>
-    <div class="step"><span class="n">3</span><p><strong>Lưu kết quả</strong>Tải từng ảnh, tải tất cả (ZIP), hoặc lưu vào Ảnh trên điện thoại.</p></div>
+    <div class="step"><span class="n">3</span><p><strong>Chỉnh tay nếu cần</strong>Ảnh nào chưa sạch, bấm “Sửa” rồi khoanh vùng cần giữ hoặc tô xoá.</p></div>
+    <div class="step"><span class="n">4</span><p><strong>Lưu kết quả</strong>Tải từng ảnh, tải tất cả (ZIP), hoặc lưu vào Ảnh trên điện thoại.</p></div>
   </div>
 
   <div class="grid" id="grid"></div>
 
-  <p class="note">Mẹo: giữ ngón tay (hoặc chuột) lên một ảnh để xem lại ảnh gốc. Đổi nền hoặc định dạng sau khi xử lý không cần chạy lại AI. *TIFF chỉ mở được trên Safari. Ảnh rất lớn trên điện thoại nên giới hạn 2048–4096 px để tránh hết bộ nhớ.</p>
+  <p class="note">Mẹo: giữ ngón tay (hoặc chuột) lên một ảnh để xem lại ảnh gốc. Ảnh nhiều màu, AI không biết đâu là nền: bấm “Sửa” và khoanh quanh phần muốn giữ. Đổi nền hoặc định dạng sau khi xử lý không cần chạy lại AI. *TIFF chỉ mở được trên Safari. Ảnh rất lớn trên điện thoại nên giới hạn 2048–4096 px để tránh hết bộ nhớ.</p>
+</div>
+
+<div class="ed-modal" id="editor" hidden role="dialog" aria-modal="true" aria-labelledby="edName">
+  <div class="ed-top">
+    <button class="ghost" id="edCancel">Huỷ</button>
+    <div class="ed-title"><span class="ed-eyebrow">Chỉnh tay</span><span class="ed-name" id="edName"></span></div>
+    <button class="primary" id="edApply">Áp dụng</button>
+  </div>
+  <div class="ed-area" id="edArea">
+    <canvas id="edCanvas" aria-label="Vùng chỉnh ảnh"></canvas>
+    <div class="ed-zoom">
+      <button id="edZoomOut" aria-label="Thu nhỏ">−</button>
+      <button id="edZoomIn" aria-label="Phóng to">+</button>
+      <button id="edFit">Vừa khung</button>
+    </div>
+    <div class="ed-busy" id="edBusy" hidden><span id="edBusyMsg"></span></div>
+  </div>
+  <div class="ed-tools">
+    <div class="seg" role="toolbar" aria-label="Công cụ chỉnh">
+      <button data-tool="lassoKeep" aria-pressed="false"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="11" rx="9" ry="7" stroke-dasharray="3 2.6"/><path d="M8.5 11l2.3 2.3 4.7-4.7"/></svg><span>Khoanh giữ</span></button>
+      <button data-tool="lassoErase" aria-pressed="false"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="11" rx="9" ry="7" stroke-dasharray="3 2.6"/><path d="M9.5 8.5l5 5M14.5 8.5l-5 5"/></svg><span>Khoanh xoá</span></button>
+      <button data-tool="brushErase" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M8 20h12"/><path d="M4.6 14.4l8.2-8.2a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L11.6 17.4H7.6z"/><path d="M8.6 10.4l5 5"/></svg><span>Cọ xoá</span></button>
+      <button data-tool="brushKeep" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M18.4 3.6a2.1 2.1 0 0 1 3 3L12 16l-3-3z"/><path d="M9 13c-2 0-3.5 1.5-3.5 3.5 0 1.2-.8 2.3-2 2.5 1 .9 2.5 1.5 4 1.5a4 4 0 0 0 4-4z"/></svg><span>Cọ giữ</span></button>
+      <button data-tool="pan" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/></svg><span>Di chuyển</span></button>
+    </div>
+    <div class="opts" id="edLassoOpts">
+      <label for="edInside">Trong vòng</label>
+      <select id="edInside">
+        <option value="ai" selected>AI tách lại</option>
+        <option value="all">Giữ hết</option>
+      </select>
+      <label class="chk"><input type="checkbox" id="edOutside" checked> Xoá hết ngoài vòng</label>
+    </div>
+    <div class="opts" id="edSizeWrap" hidden>
+      <label for="edSize">Cỡ cọ</label>
+      <input type="range" id="edSize" min="4" max="120" value="30">
+    </div>
+    <div class="opts"><label class="chk"><input type="checkbox" id="edGhost" checked> Hiện mờ phần đã xoá</label></div>
+    <div class="ed-hist">
+      <button id="edUndo" disabled>Hoàn tác</button>
+      <button id="edReset">Về kết quả AI</button>
+    </div>
+    <p class="ed-hint" id="edHint"></p>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -303,6 +387,7 @@ function card(it){
     <div class="meta"><span class="name"></span><span class="dims"></span><span class="err" hidden></span></div>
     <div class="cardact">
       <button class="grow dl" disabled>Tải về</button>
+      <button class="ed" disabled>Sửa</button>
       <button class="rm" aria-label="Bỏ ảnh này">✕</button>
     </div>`;
   el.querySelector('.name').textContent = it.name; el.querySelector('.name').title = it.name;
@@ -313,13 +398,14 @@ function card(it){
   stage.addEventListener('contextmenu', e=>e.preventDefault());
   el.querySelector('.dl').onclick = () => saveOne(it);
   el.querySelector('.rm').onclick = () => removeItem(it);
+  el.querySelector('.ed').onclick = () => openEditor(it);
   it.el = el; return el;
 }
 function paint(it){
   const el=it.el; if(!el) return;
   const pill=el.querySelector('.pill'), stage=el.querySelector('.stage');
   const map = { reading:['Đang đọc',''], ready:['Chờ xử lý',''], run:['Đang xoá nền','run'], done:['Xong','ok'], error:['Lỗi','bad'] };
-  const [t,c]=map[it.status]; pill.textContent=t; pill.className='pill '+c;
+  let [t,c]=map[it.status]; if (it.status==='done' && it.edited) t='Đã chỉnh tay'; pill.textContent=t; pill.className='pill '+c;
   el.querySelector('.ph').hidden = !!it.inputURL;
   const orig=el.querySelector('.orig'), res=el.querySelector('.res');
   if (it.inputURL && orig.src!==it.inputURL) orig.src=it.inputURL;
@@ -343,6 +429,7 @@ function refresh(){
   els.share.hidden = !canShareFiles();
   els.share.disabled = busy || done===0;
   els.count.textContent = n ? `${done}/${n} xong` : '';
+  for (const it of items) if (it.el) it.el.querySelector('.ed').disabled = busy || !it.input || it.status==='run';
   if (!busy) els.msg.textContent = n===0 ? 'Chưa có ảnh nào.' : (todo ? `${todo} ảnh đang chờ. Bấm “Xoá nền” để bắt đầu.` : 'Đã xử lý xong tất cả.');
 }
 
@@ -598,7 +685,7 @@ els.bg.onchange = () => { els.color.hidden = els.bg.value!=='custom'; rerenderAl
 els.color.oninput = () => rerenderAll();
 els.fmt.onchange = () => rerenderAll();
 els.clean.onchange = async () => {
-  for (const it of items) if (it.raw){ await finalize(it); await rerender(it); paint(it); }
+  for (const it of items) if (it.raw && !it.edited){ await finalize(it); await rerender(it); paint(it); }
 };
 
 /* ---------- saving ---------- */
@@ -629,6 +716,277 @@ els.share.onclick = async () => {
   try{ await navigator.share({ files }); }
   catch(e){ if (e.name!=='AbortError') toast('Không chia sẻ được, hãy dùng nút “Tải về”.'); }
 };
+/* ================= Manual editor: lasso + brushes on the mask ================= */
+const ED_MAX = IS_MOBILE ? 1600 : 2400;          // editing resolution (mask is scaled to full size on save)
+const UNDO_MAX = IS_MOBILE ? 8 : 20;
+const E = id => document.getElementById(id);
+const ee = { modal:E('editor'), area:E('edArea'), cv:E('edCanvas'), name:E('edName'), busy:E('edBusy'), busyMsg:E('edBusyMsg'),
+  size:E('edSize'), sizeWrap:E('edSizeWrap'), lassoOpts:E('edLassoOpts'), inside:E('edInside'), outside:E('edOutside'),
+  ghost:E('edGhost'), undo:E('edUndo'), reset:E('edReset'), fit:E('edFit'), zin:E('edZoomIn'), zout:E('edZoomOut'),
+  cancel:E('edCancel'), apply:E('edApply'), hint:E('edHint'), tools:[...document.querySelectorAll('.seg [data-tool]')] };
+const dctx = ee.cv.getContext('2d');
+const ed = { it:null, src:null, mask:null, mctx:null, cut:null, start:null, undo:[], view:{s:1,tx:0,ty:0}, fitS:1, W:0, H:0,
+  tool:'lassoKeep', dirty:true, pts:null, drawing:false, stroke:null, panning:null, pinch:null, ptrs:new Map(), hover:null,
+  busy:false, zoomed:false, colors:null, pattern:null, space:false };
+const HINTS = {
+  lassoKeep:'Vẽ một vòng kín quanh phần muốn giữ, thả tay để áp dụng. AI sẽ tách lại riêng trong vòng đó.',
+  lassoErase:'Vẽ một vòng kín quanh phần muốn xoá, thả tay để áp dụng.',
+  brushErase:'Tô lên những chỗ còn sót nền để xoá.',
+  brushKeep:'Tô lên những chỗ bị xoá nhầm để lấy lại.',
+  pan:'Kéo để di chuyển ảnh. Dùng hai ngón tay hoặc con lăn chuột để phóng to, thu nhỏ.' };
+
+const mk = (w,h) => { const c=document.createElement('canvas'); c.width=w; c.height=h; return c; };
+const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
+function snap(){ const d=ed.mctx.getImageData(0,0,ed.mask.width,ed.mask.height).data, a=new Uint8Array(d.length>>2);
+  for (let i=0;i<a.length;i++) a[i]=d[(i<<2)+3]; return a; }
+function restoreMask(a){ const im=ed.mctx.createImageData(ed.mask.width,ed.mask.height), d=im.data;
+  for (let i=0;i<a.length;i++) d[(i<<2)+3]=a[i]; ed.mctx.putImageData(im,0,0); ed.dirty=true; draw(); }
+function pushUndo(a){ ed.undo.push(a); while (ed.undo.length>UNDO_MAX) ed.undo.shift(); ee.undo.disabled=false; }
+function setBusyEd(on,msg){ ed.busy=on; ee.busy.hidden=!on; if (msg) ee.busyMsg.textContent=msg; }
+new MutationObserver(()=>{ if (ed.busy && els.msg.textContent) ee.busyMsg.textContent=els.msg.textContent; })
+  .observe(els.msg,{childList:true,characterData:true,subtree:true});
+
+function readColors(){
+  const cs=getComputedStyle(document.documentElement), v=n=>cs.getPropertyValue(n).trim();
+  ed.colors={ bg:v('--bg'), a:v('--chk-a'), b:v('--chk-b'), accent:v('--accent'), bad:v('--bad') };
+  const t=mk(16,16), g=t.getContext('2d'); g.fillStyle=ed.colors.a; g.fillRect(0,0,16,16);
+  g.fillStyle=ed.colors.b; g.fillRect(0,0,8,8); g.fillRect(8,8,8,8);
+  ed.pattern=dctx.createPattern(t,'repeat');
+}
+
+async function openEditor(it){
+  if (busy || !it.input || !ee.modal.hidden) return;
+  ed.it=it;
+  const img=await loadImg(it.input);
+  const sc=Math.min(1, ED_MAX/Math.max(img.naturalWidth,img.naturalHeight));
+  const w=Math.round(img.naturalWidth*sc), h=Math.round(img.naturalHeight*sc);
+  ed.src=mk(w,h); ed.src.getContext('2d').drawImage(img,0,0,w,h);
+  ed.mask=mk(w,h); ed.mctx=ed.mask.getContext('2d',{willReadFrequently:true});
+  if (it.fg){ const f=await loadImg(it.fg); ed.mctx.drawImage(f,0,0,w,h); }
+  ed.cut=mk(w,h); ed.start=snap(); ed.undo=[]; ee.undo.disabled=true; ed.zoomed=false; ed.dirty=true;
+  ee.name.textContent=it.name; ee.cancel.textContent='Huỷ'; ee.cancel.dataset.armed='';
+  ee.modal.hidden=false; document.body.style.overflow='hidden';
+  readColors(); sizeCanvas(); fit(); setTool(ed.tool);
+}
+function closeEditor(){
+  ee.modal.hidden=true; document.body.style.overflow='';
+  Object.assign(ed,{ it:null, src:null, mask:null, mctx:null, cut:null, start:null, undo:[], pts:null, stroke:null, drawing:false });
+  ed.ptrs.clear(); refresh();
+}
+function setTool(t){
+  ed.tool=t;
+  ee.tools.forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.tool===t)));
+  ee.sizeWrap.hidden = !t.startsWith('brush');
+  ee.lassoOpts.hidden = t!=='lassoKeep';
+  ee.hint.textContent = HINTS[t];
+  ee.cv.style.cursor = t==='pan' ? 'grab' : t.startsWith('brush') ? 'none' : 'crosshair';
+  draw();
+}
+ee.tools.forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
+
+/* ---- view ---- */
+function sizeCanvas(){
+  const r=ee.area.getBoundingClientRect(), dpr=Math.min(window.devicePixelRatio||1,2);
+  ee.cv.width=Math.max(1,Math.round(r.width*dpr)); ee.cv.height=Math.max(1,Math.round(r.height*dpr));
+  ed.dpr=dpr; ed.W=r.width; ed.H=r.height; draw();
+}
+function fit(){
+  if (!ed.src) return;
+  const iw=ed.src.width, ih=ed.src.height, s=Math.min(ed.W/iw, ed.H/ih)*0.94;
+  ed.fitS=s; ed.view={ s, tx:(ed.W-iw*s)/2, ty:(ed.H-ih*s)/2 }; ed.zoomed=false; draw();
+}
+new ResizeObserver(()=>{ if (!ee.modal.hidden && ed.src){ sizeCanvas(); if (!ed.zoomed) fit(); } }).observe(ee.area);
+function zoomAt(x,y,f){
+  const v=ed.view, s=clamp(v.s*f, ed.fitS*0.5, ed.fitS*20), ix=(x-v.tx)/v.s, iy=(y-v.ty)/v.s;
+  v.s=s; v.tx=x-ix*s; v.ty=y-iy*s; ed.zoomed=true; draw();
+}
+ee.zin.onclick=()=>zoomAt(ed.W/2,ed.H/2,1.4);
+ee.zout.onclick=()=>zoomAt(ed.W/2,ed.H/2,1/1.4);
+ee.fit.onclick=fit;
+
+let raf=0;
+function draw(){ if (!raf) raf=requestAnimationFrame(()=>{ raf=0; render(); }); }
+function render(){
+  if (!ed.src) return;
+  if (ed.dirty){
+    const g=ed.cut.getContext('2d');
+    g.globalCompositeOperation='copy'; g.drawImage(ed.src,0,0);
+    g.globalCompositeOperation='destination-in'; g.drawImage(ed.mask,0,0);
+    g.globalCompositeOperation='source-over'; ed.dirty=false;
+  }
+  const {s,tx,ty}=ed.view, iw=ed.src.width*s, ih=ed.src.height*s;
+  dctx.setTransform(ed.dpr,0,0,ed.dpr,0,0);
+  dctx.fillStyle=ed.colors.bg; dctx.fillRect(0,0,ed.W,ed.H);
+  dctx.fillStyle=ed.pattern; dctx.fillRect(tx,ty,iw,ih);
+  dctx.imageSmoothingEnabled=true; dctx.imageSmoothingQuality = s<1 ? 'high' : 'low';
+  if (ee.ghost.checked){ dctx.globalAlpha=0.28; dctx.drawImage(ed.src,tx,ty,iw,ih); dctx.globalAlpha=1; }
+  dctx.drawImage(ed.cut,tx,ty,iw,ih);
+  if (ed.pts && ed.pts.length>1){
+    dctx.beginPath();
+    ed.pts.forEach(([x,y],i)=>{ const X=tx+x*s, Y=ty+y*s; i?dctx.lineTo(X,Y):dctx.moveTo(X,Y); });
+    dctx.closePath();
+    const col = ed.tool==='lassoErase' ? ed.colors.bad : ed.colors.accent;
+    dctx.globalAlpha=0.14; dctx.fillStyle=col; dctx.fill(); dctx.globalAlpha=1;
+    dctx.lineWidth=3; dctx.strokeStyle='#ffffff'; dctx.stroke();
+    dctx.lineWidth=2; dctx.strokeStyle=col; dctx.setLineDash([7,5]); dctx.stroke(); dctx.setLineDash([]);
+  }
+  if (ed.hover && ed.tool.startsWith('brush') && !ed.pinch){
+    const [x,y]=ed.hover; dctx.beginPath(); dctx.arc(x,y,ee.size.value/2,0,Math.PI*2);
+    dctx.lineWidth=2; dctx.strokeStyle='#ffffff'; dctx.stroke();
+    dctx.lineWidth=1; dctx.strokeStyle='#000000'; dctx.setLineDash([3,3]); dctx.stroke(); dctx.setLineDash([]);
+  }
+}
+ee.ghost.onchange=draw;
+
+/* ---- pointer input: draw with one pointer, pinch/pan with two ---- */
+const cv=ee.cv;
+const pos = e => { const r=cv.getBoundingClientRect(); return [e.clientX-r.left, e.clientY-r.top]; };
+const toImg = ([x,y]) => [(x-ed.view.tx)/ed.view.s, (y-ed.view.ty)/ed.view.s];
+function cancelAction(){
+  if (ed.stroke){ restoreMask(ed.stroke.before); ed.stroke=null; }
+  ed.drawing=false; ed.pts=null; ed.panning=null; draw();
+}
+function brushSeg(a,b){
+  const g=ed.mctx; g.save();
+  g.globalCompositeOperation = ed.tool==='brushErase' ? 'destination-out' : 'source-over';
+  g.strokeStyle='#000'; g.lineCap='round'; g.lineJoin='round'; g.lineWidth=ee.size.value/ed.view.s;
+  g.beginPath(); g.moveTo(a[0],a[1]); g.lineTo(b[0]+0.01,b[1]); g.stroke(); g.restore();
+  ed.dirty=true; draw();
+}
+cv.addEventListener('pointerdown', e=>{
+  if (ed.busy) return;
+  try{ cv.setPointerCapture(e.pointerId); }catch{}
+  const p=pos(e); ed.ptrs.set(e.pointerId,p); ed.hover = e.pointerType==='mouse' ? p : null;
+  if (ed.ptrs.size===2){
+    cancelAction();
+    const [a,b]=[...ed.ptrs.values()];
+    ed.pinch={ d0:Math.hypot(a[0]-b[0],a[1]-b[1])||1, m0:[(a[0]+b[0])/2,(a[1]+b[1])/2], v0:{...ed.view} };
+    return;
+  }
+  if (ed.ptrs.size>2) return;
+  if (ed.tool==='pan' || e.button===1 || ed.space){ ed.panning={ p0:p, v0:{...ed.view} }; cv.style.cursor='grabbing'; return; }
+  if (e.button>0) return;
+  if (ed.tool.startsWith('lasso')){ ed.drawing=true; ed.pts=[toImg(p)]; draw(); }
+  else { const q=toImg(p); ed.stroke={ before:snap(), last:q }; brushSeg(q,q); }
+});
+cv.addEventListener('pointermove', e=>{
+  const p=pos(e);
+  if (e.pointerType==='mouse' || ed.ptrs.has(e.pointerId)) ed.hover=p;
+  if (!ed.ptrs.has(e.pointerId)){ draw(); return; }
+  ed.ptrs.set(e.pointerId,p);
+  if (ed.pinch){
+    if (ed.ptrs.size<2) return;
+    const [a,b]=[...ed.ptrs.values()], {d0,m0,v0}=ed.pinch;
+    const d=Math.hypot(a[0]-b[0],a[1]-b[1]), m=[(a[0]+b[0])/2,(a[1]+b[1])/2];
+    const s=clamp(v0.s*d/d0, ed.fitS*0.5, ed.fitS*20), ix=(m0[0]-v0.tx)/v0.s, iy=(m0[1]-v0.ty)/v0.s;
+    ed.view={ s, tx:m[0]-ix*s, ty:m[1]-iy*s }; ed.zoomed=true; draw(); return;
+  }
+  if (ed.panning){ const {p0,v0}=ed.panning; ed.view={ s:v0.s, tx:v0.tx+p[0]-p0[0], ty:v0.ty+p[1]-p0[1] }; ed.zoomed=true; draw(); return; }
+  if (ed.drawing){
+    const q=toImg(p), l=ed.pts[ed.pts.length-1];
+    if (Math.hypot(q[0]-l[0],q[1]-l[1])*ed.view.s>2) ed.pts.push(q);
+    draw(); return;
+  }
+  if (ed.stroke){
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    for (const ce of (evs.length?evs:[e])){ const q=toImg(pos(ce)); brushSeg(ed.stroke.last,q); ed.stroke.last=q; }
+  }
+});
+function endPointer(e){
+  if (!ed.ptrs.has(e.pointerId)) return;
+  ed.ptrs.delete(e.pointerId);
+  if (e.pointerType!=='mouse') ed.hover=null;
+  if (ed.pinch){ if (ed.ptrs.size===0) ed.pinch=null; draw(); return; }
+  if (ed.panning){ ed.panning=null; setTool(ed.tool); return; }
+  if (ed.drawing){
+    ed.drawing=false; const pts=ed.pts; ed.pts=null;
+    let area=0; for (let i=0;i<pts.length;i++){ const [x1,y1]=pts[i], [x2,y2]=pts[(i+1)%pts.length]; area+=x1*y2-x2*y1; }
+    if (e.type==='pointerup' && pts.length>=3 && Math.abs(area/2)*ed.view.s*ed.view.s>150) applyLasso(pts);
+    else draw();
+    return;
+  }
+  if (ed.stroke){ pushUndo(ed.stroke.before); ed.stroke=null; }
+}
+cv.addEventListener('pointerup', endPointer);
+cv.addEventListener('pointercancel', endPointer);
+cv.addEventListener('pointerleave', e=>{ if (e.pointerType==='mouse'){ ed.hover=null; draw(); } });
+cv.addEventListener('wheel', e=>{ e.preventDefault(); const [x,y]=pos(e); zoomAt(x,y,Math.exp(-e.deltaY*0.0015)); }, { passive:false });
+cv.addEventListener('contextmenu', e=>e.preventDefault());
+
+/* ---- lasso ---- */
+async function applyLasso(pts){
+  const path=new Path2D(); pts.forEach(([x,y],i)=> i?path.lineTo(x,y):path.moveTo(x,y)); path.closePath();
+  const before=snap(), g=ed.mctx, W=ed.mask.width, H=ed.mask.height;
+  try{
+    if (ed.tool==='lassoErase'){
+      g.save(); g.globalCompositeOperation='destination-out'; g.fill(path); g.restore();
+    } else {
+      const fill = ee.inside.value==='ai' ? await aiInside(pts, path) : null;
+      if (ee.outside.checked){ g.save(); g.globalCompositeOperation='destination-in'; g.fillStyle='#000'; g.fill(path); g.restore(); }
+      g.save(); g.clip(path);
+      if (fill){ g.clearRect(fill.x,fill.y,fill.w,fill.h); g.drawImage(fill.img,fill.x,fill.y,fill.w,fill.h); }
+      else { g.fillStyle='#000'; g.fillRect(0,0,W,H); }
+      g.restore();
+    }
+    pushUndo(before);
+  }catch(err){ console.error(err); restoreMask(before); toast('Không áp dụng được vùng khoanh, hãy thử lại.'); }
+  ed.dirty=true; draw();
+}
+/* Run the AI again on just the circled area (outside the circle painted white so the AI treats it as background) */
+async function aiInside(pts, path){
+  const W=ed.src.width, H=ed.src.height;
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  for (const [x,y] of pts){ x0=Math.min(x0,x); y0=Math.min(y0,y); x1=Math.max(x1,x); y1=Math.max(y1,y); }
+  const pad=Math.max(x1-x0,y1-y0)*0.04;
+  x0=Math.max(0,Math.floor(x0-pad)); y0=Math.max(0,Math.floor(y0-pad)); x1=Math.min(W,Math.ceil(x1+pad)); y1=Math.min(H,Math.ceil(y1+pad));
+  const w=x1-x0, h=y1-y0; if (w<8 || h<8) return null;
+  const c=mk(w,h), g=c.getContext('2d');
+  g.drawImage(ed.src,x0,y0,w,h,0,0,w,h);
+  g.globalCompositeOperation='destination-in'; g.translate(-x0,-y0); g.fill(path); g.setTransform(1,0,0,1,0,0);
+  g.globalCompositeOperation='destination-over'; g.fillStyle='#ffffff'; g.fillRect(0,0,w,h);
+  setBusyEd(true,'AI đang tách lại vùng đã khoanh…');
+  try{
+    const raw = await cut(null, await canvasToBlob(c,'image/png'));
+    const fg = await refine(raw);
+    return { img: await loadImg(fg), x:x0, y:y0, w, h };
+  }catch(err){
+    console.warn(err); toast('AI không tách được vùng này nên đã giữ toàn bộ phần trong vòng. Dùng “Cọ xoá” để làm sạch thêm.');
+    return null;
+  }finally{ setBusyEd(false); }
+}
+
+/* ---- history, cancel, apply ---- */
+ee.undo.onclick=()=>{ if (ed.busy || !ed.undo.length) return; restoreMask(ed.undo.pop()); ee.undo.disabled=!ed.undo.length; };
+ee.reset.onclick=()=>{ if (ed.busy) return; pushUndo(snap()); restoreMask(ed.start); };
+ee.cancel.onclick=()=>{
+  if (ed.busy) return;
+  if (ed.undo.length && !ee.cancel.dataset.armed){
+    ee.cancel.dataset.armed='1'; ee.cancel.textContent='Bỏ thay đổi?';
+    setTimeout(()=>{ ee.cancel.dataset.armed=''; ee.cancel.textContent='Huỷ'; },3000);
+    return;
+  }
+  closeEditor();
+};
+ee.apply.onclick=async()=>{
+  if (ed.busy) return;
+  const it=ed.it; setBusyEd(true,'Đang lưu thay đổi…');
+  try{
+    const full=await loadImg(it.input);
+    const c=mk(full.naturalWidth,full.naturalHeight), g=c.getContext('2d');
+    g.drawImage(full,0,0); g.globalCompositeOperation='destination-in'; g.imageSmoothingQuality='high';
+    g.drawImage(ed.mask,0,0,c.width,c.height);
+    it.fg=await canvasToBlob(c,'image/png'); it.edited=true; it.status='done'; it.err='';
+    await rerender(it); paint(it);
+  }catch(err){ console.error(err); setBusyEd(false); toast('Không lưu được: '+(err.message||err)); return; }
+  setBusyEd(false); closeEditor(); toast('Đã lưu chỉnh sửa. Bấm “Tải về” để lưu ảnh.');
+};
+document.addEventListener('keydown', e=>{
+  if (ee.modal.hidden) return;
+  if ((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='z'){ e.preventDefault(); ee.undo.click(); }
+  else if (e.code==='Space' && !e.repeat && e.target.tagName!=='BUTTON'){ e.preventDefault(); ed.space=true; cv.style.cursor='grab'; }
+});
+document.addEventListener('keyup', e=>{ if (e.code==='Space' && ed.space){ ed.space=false; if (!ee.modal.hidden) setTool(ed.tool); } });
+
 refresh();
 </script>
 </body>
