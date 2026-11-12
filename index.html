@@ -115,6 +115,21 @@ button.ghost{background:transparent}
   .cardact button{flex:1 1 auto;justify-content:center}
 }
 
+/* ---------- Selection & batch download ---------- */
+.pick{position:absolute;top:8px;right:8px;display:flex;align-items:center;gap:6px;padding:4px 9px 4px 6px;border-radius:99px;
+  background:var(--surface);border:1px solid var(--line);font-size:12px;font-weight:600;color:var(--ink);cursor:pointer;z-index:2}
+.pick input{width:18px;height:18px;margin:0;accent-color:var(--accent);cursor:pointer}
+.card.unsel .stage img.res{opacity:.35}
+.card.unsel{border-style:dashed}
+.card.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.selbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.selbar .selcount{font-weight:700;font-variant-numeric:tabular-nums}
+.selbar .links{display:flex;gap:6px;flex-wrap:wrap}
+.selbar .links button{min-height:34px;padding:5px 10px;font-size:13px}
+.selbar .dlgrp{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.selbar select{min-height:40px}
+@media (max-width:560px){ .selbar .dlgrp{margin-left:0;width:100%} .selbar .dlgrp > *{flex:1 1 auto} .selbar #dlSel{justify-content:center} }
+
 /* ---------- Text & logo panel ---------- */
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:14px}
 .panel-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px}
@@ -330,6 +345,22 @@ input[type=range]{accent-color:var(--accent);width:140px}
     <div class="step"><span class="n">4</span><p><strong>Lưu kết quả</strong>Tải từng ảnh, tải tất cả (ZIP), hoặc lưu vào Ảnh trên điện thoại.</p></div>
   </div>
 
+  <div class="selbar" id="selbar" hidden>
+    <span class="selcount" id="selCount">Đã chọn 0 ảnh</span>
+    <div class="links">
+      <button id="selAll">Chọn tất cả</button>
+      <button id="selNone">Bỏ chọn tất cả</button>
+    </div>
+    <div class="dlgrp">
+      <select id="dlMode" aria-label="Cách tải">
+        <option value="zip">Gộp 1 file ZIP</option>
+        <option value="files">Từng ảnh riêng</option>
+        <option value="share" hidden>Lưu vào Ảnh / Chia sẻ</option>
+      </select>
+      <button class="primary" id="dlSel" disabled>Tải ảnh đã chọn</button>
+    </div>
+  </div>
+
   <div class="grid" id="grid"></div>
 
   <p class="note">Mẹo: giữ ngón tay (hoặc chuột) lên một ảnh để xem lại ảnh gốc. Ảnh nhiều màu, AI không biết đâu là nền: bấm “Sửa” và khoanh quanh phần muốn giữ. Đổi nền hoặc định dạng sau khi xử lý không cần chạy lại AI. *TIFF chỉ mở được trên Safari. Ảnh rất lớn trên điện thoại nên giới hạn 2048–4096 px để tránh hết bộ nhớ.</p>
@@ -459,6 +490,7 @@ function card(it){
       <img class="res" alt="">
       <img class="orig" alt="">
       <span class="pill"></span>
+      <label class="pick" hidden><input type="checkbox" class="selbox"> Chọn</label>
     </div>
     <div class="meta"><span class="name"></span><span class="dims"></span><span class="err" hidden></span></div>
     <div class="cardact">
@@ -475,10 +507,14 @@ function card(it){
   el.querySelector('.dl').onclick = () => saveOne(it);
   el.querySelector('.rm').onclick = () => removeItem(it);
   el.querySelector('.ed').onclick = () => openEditor(it);
+  const pick = el.querySelector('.pick');
+  ['pointerdown','pointerup'].forEach(t => pick.addEventListener(t, e => e.stopPropagation()));
+  el.querySelector('.selbox').onchange = e => { it.sel = e.target.checked; paintSel(it); refresh(); };
   it.el = el; return el;
 }
 function paint(it){
   const el=it.el; if(!el) return;
+  paintSel(it);
   const pill=el.querySelector('.pill'), stage=el.querySelector('.stage');
   const map = { reading:['Đang đọc',''], ready:['Chờ xử lý',''], run:['Đang xoá nền','run'], done:['Xong','ok'], error:['Lỗi','bad'] };
   let [t,c]=map[it.status]; if (it.status==='done' && it.edited) t='Đã chỉnh tay'; pill.textContent=t; pill.className='pill '+c;
@@ -499,11 +535,12 @@ function refresh(){
   els.empty.hidden = n>0;
   els.run.disabled = busy || todo===0;
   els.run.textContent = busy ? 'Đang xử lý…' : (todo && done ? `Xoá nền (${todo} ảnh còn lại)` : 'Xoá nền');
-  els.saveAll.disabled = busy || done===0;
-  els.saveAll.textContent = done>1 ? `Tải tất cả (${done}, ZIP)` : 'Tải về';
+  const nsel = selected().length;
+  els.saveAll.disabled = busy || nsel===0;
+  els.saveAll.textContent = nsel ? `Tải ${nsel} ảnh đã chọn` : 'Tải ảnh đã chọn';
+  updateSelBar(nsel, done);
   els.clear.disabled = busy || n===0;
-  els.share.hidden = !canShareFiles();
-  els.share.disabled = busy || done===0;
+  els.share.hidden = true;
   els.count.textContent = n ? `${done}/${n} xong` : '';
   updatePreview();
   for (const it of items) if (it.el) it.el.querySelector('.ed').disabled = busy || !it.input || it.status==='run';
@@ -778,27 +815,73 @@ function download(blob,name){
   setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
 }
 function saveOne(it){ if (it.out) download(it.out, outName(it)); }
-els.saveAll.onclick = async () => {
-  const done=items.filter(i=>i.out);
-  if (done.length===1) return saveOne(done[0]);
-  els.msg.textContent='Đang nén ZIP…';
-  const zip=new JSZip(), used=new Set();
-  for (const it of done){
-    let n=outName(it), i=2; while(used.has(n)){ n=outName(it).replace(/(\.\w+)$/,`-${i++}$1`); } used.add(n);
-    zip.file(n, it.out);
+/* ---------- selection + batch download ---------- */
+const sb = { bar:$('selbar'), count:$('selCount'), all:$('selAll'), none:$('selNone'), mode:$('dlMode'), go:$('dlSel') };
+const selected = () => items.filter(i => i.out && i.sel);
+function paintSel(it){
+  const el = it.el; if (!el) return;
+  if (it.out && it.sel === undefined) it.sel = true;            // finished images start selected
+  const pick = el.querySelector('.pick'), box = el.querySelector('.selbox');
+  pick.hidden = !it.out; box.checked = !!it.sel;
+  el.classList.toggle('sel', !!(it.out && it.sel));
+  el.classList.toggle('unsel', !!(it.out && !it.sel));
+}
+function updateSelBar(nsel, done){
+  sb.bar.hidden = done===0;
+  sb.count.textContent = `Đã chọn ${nsel}/${items.filter(i=>i.out).length} ảnh`;
+  sb.go.disabled = busy || nsel===0;
+  sb.go.textContent = nsel ? (sb.mode.value==='share' ? `Lưu ${nsel} ảnh` : `Tải ${nsel} ảnh đã chọn`) : 'Chưa chọn ảnh nào';
+}
+sb.all.onclick  = () => { items.forEach(i => { if (i.out){ i.sel = true; paintSel(i); } }); refresh(); };
+sb.none.onclick = () => { items.forEach(i => { if (i.out){ i.sel = false; paintSel(i); } }); refresh(); };
+sb.mode.onchange = () => { try{ localStorage.setItem('tachnen-dlmode', sb.mode.value); }catch{} refresh(); };
+(function initMode(){
+  const shareOK = canShareFiles();
+  sb.mode.querySelector('[value="share"]').hidden = !shareOK;
+  let m = null; try{ m = localStorage.getItem('tachnen-dlmode'); }catch{}
+  if (m === 'share' && !shareOK) m = null;
+  sb.mode.value = m || (IS_MOBILE && shareOK ? 'share' : 'zip');   // phones: save straight to Photos
+})();
+
+function uniqueNames(list){
+  const used = new Set();
+  return list.map(it => { let n = outName(it), i = 2; while (used.has(n)) n = outName(it).replace(/(\.\w+)$/, `-${i++}$1`); used.add(n); return n; });
+}
+const wait = ms => new Promise(r => setTimeout(r, ms));
+async function downloadSelected(){
+  const list = selected(); if (!list.length) return;
+  const names = uniqueNames(list), mode = sb.mode.value;
+  if (mode === 'share'){
+    // must run straight from the tap (no await before share) or iOS refuses
+    const files = list.map((it,i) => new File([it.out], names[i], { type: it.out.type }));
+    try { await navigator.share({ files }); }
+    catch(e){ if (e.name !== 'AbortError') toast('Không lưu được qua chia sẻ. Hãy chọn kiểu “Gộp 1 file ZIP”.'); }
+    return;
   }
-  const blob = await zip.generateAsync({type:'blob', compression:'STORE'});
-  download(blob, `tach-nen-${new Date().toISOString().slice(0,10)}.zip`);
-  refresh();
-};
+  if (list.length === 1) return download(list[0].out, names[0]);
+  if (mode === 'files' || typeof JSZip === 'undefined'){
+    if (mode !== 'files') toast('Không tạo được ZIP, chuyển sang tải từng ảnh.');
+    for (let i=0; i<list.length; i++){
+      els.msg.textContent = `Đang tải ảnh ${i+1}/${list.length}…`;
+      download(list[i].out, names[i]);
+      await wait(450);                                         // browsers drop downloads fired too close together
+    }
+    els.msg.textContent = `Đã tải ${list.length} ảnh. Nếu trình duyệt hỏi “cho phép tải nhiều tệp”, hãy bấm Cho phép.`;
+    return;
+  }
+  els.msg.textContent = `Đang nén ${list.length} ảnh thành ZIP…`;
+  const zip = new JSZip();
+  list.forEach((it,i) => zip.file(names[i], it.out));
+  const blob = await zip.generateAsync({ type:'blob', compression:'STORE' });
+  download(blob, `tach-nen-${list.length}-anh-${new Date().toISOString().slice(0,10)}.zip`);
+  els.msg.textContent = `Đã tải file ZIP gồm ${list.length} ảnh.`;
+}
+sb.go.onclick = downloadSelected;
+els.saveAll.onclick = downloadSelected;
 function canShareFiles(){
   try{ return !!(navigator.canShare && navigator.canShare({ files:[new File([new Blob(['x'],{type:'image/png'})],'t.png',{type:'image/png'})] })); }catch{ return false; }
 }
-els.share.onclick = async () => {
-  const files = items.filter(i=>i.out).map(i=>new File([i.out], outName(i), {type:i.out.type}));
-  try{ await navigator.share({ files }); }
-  catch(e){ if (e.name!=='AbortError') toast('Không chia sẻ được, hãy dùng nút “Tải về”.'); }
-};
+
 /* ================= Manual editor: lasso + brushes on the mask ================= */
 const ED_MAX = IS_MOBILE ? 1600 : 2400;          // editing resolution (mask is scaled to full size on save)
 const UNDO_MAX = IS_MOBILE ? 8 : 20;
