@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Montserrat:wght@400;700&family=Oswald:wght@400;700&family=Lora:wght@400;700&family=Playfair+Display:wght@400;700&family=Merriweather:wght@400;700&family=Dancing+Script:wght@400;700&family=Pacifico&family=Lobster&subset=vietnamese&display=swap">
 <style>
 /* Layout: one working column — drop zone + settings bar on top, result grid below; checkerboard (transparency) is the visual motif */
 :root{
@@ -113,6 +114,33 @@ button.ghost{background:transparent}
   .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
   .cardact button{flex:1 1 auto;justify-content:center}
 }
+
+/* ---------- Text & logo panel ---------- */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:14px}
+.panel-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px}
+.panel h2{margin:0;font-size:17px;font-weight:700;letter-spacing:-.01em}
+.panel-head span{font-size:13px;color:var(--muted)}
+.ov-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+fieldset.ov-col{border:1px solid var(--line);border-radius:12px;margin:0;padding:12px 14px 14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+fieldset.ov-col legend{padding:0 6px;font-weight:600;font-size:14px;color:var(--ink)}
+textarea{font:inherit;font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;resize:vertical;width:100%;min-height:64px}
+textarea:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.row select{flex:1 1 150px;min-width:0}
+.tog{min-width:40px;justify-content:center;font-weight:800}
+.tog[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.rng{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+.rng label{min-width:5.5em}
+.rng input[type=range]{flex:1 1 auto;width:auto;min-width:0}
+.rng output{font-family:var(--f-mono);font-variant-numeric:tabular-nums;min-width:3.2em;text-align:right;color:var(--ink)}
+.logo-pick{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.logo-pick img{width:52px;height:52px;object-fit:contain;border:1px solid var(--line);border-radius:8px;
+  background:conic-gradient(var(--chk-b) 25%,var(--chk-a) 0 50%,var(--chk-b) 0 75%,var(--chk-a) 0) 0 0/10px 10px}
+.logo-pick .ln{font-size:13px;color:var(--muted);flex:1 1 120px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv{aspect-ratio:4/3;max-width:100%;border:1px solid var(--line);border-radius:10px;overflow:hidden;position:relative;
+  background:conic-gradient(var(--chk-b) 25%,var(--chk-a) 0 50%,var(--chk-b) 0 75%,var(--chk-a) 0) 0 0/16px 16px}
+.pv img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.pv span{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:12px;font-size:13px;color:var(--muted)}
 
 /* ---------- Manual editor ---------- */
 .ed-modal{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column}
@@ -243,6 +271,52 @@ input[type=range]{accent-color:var(--accent);width:140px}
     </div>
   </div>
 
+  <section class="panel" id="ovPanel" aria-labelledby="ovTitle">
+    <div class="panel-head"><h2 id="ovTitle">Chèn chữ &amp; logo</h2><span>Áp dụng cho tất cả ảnh đã xoá nền, kể cả khi tải về</span></div>
+    <div class="ov-grid">
+      <fieldset class="ov-col">
+        <legend><label class="chk"><input type="checkbox" id="txtOn"> Chữ ở góc trái trên</label></legend>
+        <textarea id="txt" rows="2" placeholder="Nhập chữ muốn chèn (Enter để xuống dòng)"></textarea>
+        <div class="row">
+          <select id="txtFont" aria-label="Font chữ">
+          <option value="Be Vietnam Pro" style="font-family:'Be Vietnam Pro'">Be Vietnam Pro</option>
+          <option value="Roboto" style="font-family:'Roboto'">Roboto</option>
+          <option value="Montserrat" style="font-family:'Montserrat'" selected>Montserrat</option>
+          <option value="Oswald" style="font-family:'Oswald'">Oswald (chữ đứng, gọn)</option>
+          <option value="Lora" style="font-family:'Lora'">Lora (có chân)</option>
+          <option value="Playfair Display" style="font-family:'Playfair Display'">Playfair Display (sang trọng)</option>
+          <option value="Merriweather" style="font-family:'Merriweather'">Merriweather (có chân)</option>
+          <option value="Dancing Script" style="font-family:'Dancing Script'">Dancing Script (viết tay)</option>
+          <option value="Pacifico" style="font-family:'Pacifico'">Pacifico (viết tay đậm)</option>
+          <option value="Lobster" style="font-family:'Lobster'">Lobster (trang trí)</option>
+          <option value="Arial" style="font-family:'Arial'">Arial</option>
+          <option value="Times New Roman" style="font-family:'Times New Roman'">Times New Roman</option>
+          </select>
+          <input type="color" id="txtColor" value="#1554d1" aria-label="Màu chữ" title="Màu chữ">
+          <button class="tog" id="txtBold" aria-pressed="true" title="Chữ đậm">B</button>
+        </div>
+        <div class="rng"><label for="txtSize">Cỡ chữ</label><input type="range" id="txtSize" min="1.5" max="20" step="0.5" value="6"><output id="txtSizeVal"></output></div>
+        <label class="chk"><input type="checkbox" id="txtStroke"> Viền trắng quanh chữ (dễ đọc trên nền tối)</label>
+      </fieldset>
+      <fieldset class="ov-col">
+        <legend><label class="chk"><input type="checkbox" id="logoOn"> Logo ở góc phải dưới</label></legend>
+        <div class="logo-pick">
+          <img id="logoThumb" alt="Logo đã chọn" hidden>
+          <button id="logoBtn">Chọn ảnh logo</button>
+          <span class="ln" id="logoName">Chưa chọn logo</span>
+          <input type="file" id="logoFile" accept="image/*,.svg" hidden>
+        </div>
+        <div class="rng"><label for="logoSize">Cỡ logo</label><input type="range" id="logoSize" min="5" max="60" step="1" value="22"><output id="logoSizeVal"></output></div>
+        <label class="chk"><input type="checkbox" id="logoKnock"> Bỏ nền trắng của logo</label>
+        <div class="rng"><label for="ovMargin">Cách mép</label><input type="range" id="ovMargin" min="0" max="10" step="0.5" value="3"><output id="ovMarginVal"></output></div>
+      </fieldset>
+      <div class="ov-col" style="display:flex;flex-direction:column;gap:8px;min-width:0">
+        <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Xem trước</span>
+        <div class="pv"><img id="ovPrev" alt="Xem trước ảnh có chữ và logo" hidden><span id="ovPrevEmpty">Xoá nền ít nhất một ảnh để xem trước chữ và logo ở đây.</span></div>
+      </div>
+    </div>
+  </section>
+
   <div class="status" aria-live="polite">
     <span id="msg">Chưa có ảnh nào.</span>
     <div class="meter" id="meter" hidden><i id="meterbar"></i></div>
@@ -364,12 +438,14 @@ function bgValue(){ const v=els.bg.value; return v==='custom' ? els.color.value 
 async function composite(fg){
   const type = els.fmt.value; let bg = bgValue();
   if (type==='image/jpeg' && bg==='transparent') bg = '#ffffff';
-  if (type==='image/png' && bg==='transparent') return fg;
+  const over = overlaysOn();
+  if (type==='image/png' && bg==='transparent' && !over) return fg;
   const img = await loadImg(fg);
   const c=document.createElement('canvas'); c.width=img.naturalWidth; c.height=img.naturalHeight;
   const g=c.getContext('2d');
   if (bg!=='transparent'){ g.fillStyle=bg; g.fillRect(0,0,c.width,c.height); }
   g.drawImage(img,0,0);
+  if (over) await drawOverlays(g,c.width,c.height);
   return canvasToBlob(c,type, type==='image/png'?undefined:0.95);
 }
 const outName = it => `${baseOf(it.name)}-tachnen.${extFor(els.fmt.value)}`;
@@ -429,6 +505,7 @@ function refresh(){
   els.share.hidden = !canShareFiles();
   els.share.disabled = busy || done===0;
   els.count.textContent = n ? `${done}/${n} xong` : '';
+  updatePreview();
   for (const it of items) if (it.el) it.el.querySelector('.ed').disabled = busy || !it.input || it.status==='run';
   if (!busy) els.msg.textContent = n===0 ? 'Chưa có ảnh nào.' : (todo ? `${todo} ảnh đang chờ. Bấm “Xoá nền” để bắt đầu.` : 'Đã xử lý xong tất cả.');
 }
@@ -678,8 +755,14 @@ async function rerender(it){
   if (it.outURL) URL.revokeObjectURL(it.outURL);
   it.outURL = URL.createObjectURL(it.out);
 }
+let renderGen = 0;
 async function rerenderAll(){
-  for (const it of items) if (it.fg){ await rerender(it); paint(it); }
+  const my = ++renderGen;
+  for (const it of items) if (it.fg){
+    await rerender(it); if (my!==renderGen) return;
+    paint(it);
+  }
+  updatePreview();
 }
 els.bg.onchange = () => { els.color.hidden = els.bg.value!=='custom'; rerenderAll(); };
 els.color.oninput = () => rerenderAll();
@@ -986,6 +1069,125 @@ document.addEventListener('keydown', e=>{
   else if (e.code==='Space' && !e.repeat && e.target.tagName!=='BUTTON'){ e.preventDefault(); ed.space=true; cv.style.cursor='grab'; }
 });
 document.addEventListener('keyup', e=>{ if (e.code==='Space' && ed.space){ ed.space=false; if (!ee.modal.hidden) setTool(ed.tool); } });
+
+/* ================= Text (top-left) & logo (bottom-right) overlays ================= */
+const O = id => document.getElementById(id);
+const ov = { txtOn:O('txtOn'), txt:O('txt'), font:O('txtFont'), color:O('txtColor'), bold:O('txtBold'), size:O('txtSize'), sizeVal:O('txtSizeVal'),
+  stroke:O('txtStroke'), logoOn:O('logoOn'), logoBtn:O('logoBtn'), logoFile:O('logoFile'), logoThumb:O('logoThumb'), logoName:O('logoName'),
+  logoSize:O('logoSize'), logoSizeVal:O('logoSizeVal'), knock:O('logoKnock'), margin:O('ovMargin'), marginVal:O('ovMarginVal'),
+  prev:O('ovPrev'), prevEmpty:O('ovPrevEmpty') };
+let logoSrc = null, logoDraw = null;   // original logo image, and the version actually drawn (white removed if asked)
+const OV_KEY = 'tachnen-overlay-v1', LOGO_KEY = 'tachnen-logo-v1';
+
+function overlaysOn(){ return (ov.txtOn.checked && ov.txt.value.trim()!=='') || (ov.logoOn.checked && !!logoDraw); }
+async function drawOverlays(g, w, h){
+  const side = Math.min(w,h), m = parseFloat(ov.margin.value)/100*side;
+  if (ov.txtOn.checked && ov.txt.value.trim()){
+    const px = Math.max(8, parseFloat(ov.size.value)/100*side);
+    const fam = ov.font.value, wt = ov.bold.getAttribute('aria-pressed')==='true' ? 700 : 400;
+    const font = `${wt} ${px}px "${fam}", "Be Vietnam Pro", Arial, sans-serif`;
+    try { await document.fonts.load(font, ov.txt.value); } catch {}
+    g.save();
+    g.font = font; g.textBaseline = 'alphabetic'; g.textAlign = 'left'; g.fillStyle = ov.color.value;
+    const lines = ov.txt.value.replace(/\s+$/,'').split('\n'), lh = px*1.22;
+    const top = Math.max(...lines.map(l => g.measureText(l||' ').actualBoundingBoxAscent || px*0.8));
+    lines.forEach((ln,i) => {
+      const y = m + top + i*lh;
+      if (ov.stroke.checked){ g.lineWidth = Math.max(2, px*0.14); g.strokeStyle = '#ffffff'; g.lineJoin = 'round'; g.strokeText(ln, m, y); }
+      g.fillText(ln, m, y);
+    });
+    g.restore();
+  }
+  if (ov.logoOn.checked && logoDraw){
+    const lw0 = logoDraw.width, lh0 = logoDraw.height;
+    let lw = parseFloat(ov.logoSize.value)/100*side, lh = lw*lh0/lw0;
+    if (lh > h*0.6){ lh = h*0.6; lw = lh*lw0/lh0; }
+    g.save(); g.imageSmoothingQuality = 'high';
+    g.drawImage(logoDraw, w-m-lw, h-m-lh, lw, lh);
+    g.restore();
+  }
+}
+
+/* logo: keep a canvas copy; optionally turn near-white pixels transparent */
+function buildLogo(){
+  if (!logoSrc){ logoDraw = null; return; }
+  const max = 1200, s = Math.min(1, max/Math.max(logoSrc.naturalWidth||logoSrc.width, logoSrc.naturalHeight||logoSrc.height));
+  const w = Math.max(1, Math.round((logoSrc.naturalWidth||logoSrc.width)*s)), h = Math.max(1, Math.round((logoSrc.naturalHeight||logoSrc.height)*s));
+  const c = document.createElement('canvas'); c.width=w; c.height=h;
+  const g = c.getContext('2d', { willReadFrequently:true }); g.drawImage(logoSrc,0,0,w,h);
+  if (ov.knock.checked){
+    const d = g.getImageData(0,0,w,h), p = d.data;
+    for (let i=0;i<p.length;i+=4){
+      const mn = Math.min(p[i],p[i+1],p[i+2]);
+      if (mn > 200) p[i+3] = Math.round(p[i+3] * Math.max(0, (255-mn)/55));   // fade out white, keep soft edges
+    }
+    g.putImageData(d,0,0);
+  }
+  logoDraw = c;
+  ov.logoThumb.src = c.toDataURL('image/png'); ov.logoThumb.hidden = false;
+}
+async function setLogoFromBlob(blob, name){
+  try{
+    logoSrc = await loadImg(blob);
+    ov.logoName.textContent = name || 'Logo'; ov.logoBtn.textContent = 'Đổi logo';
+    buildLogo(); ov.logoOn.checked = true;
+    return true;
+  }catch{ toast('Không đọc được file logo này.'); return false; }
+}
+ov.logoBtn.onclick = () => ov.logoFile.click();
+ov.logoFile.onchange = async () => {
+  const f = ov.logoFile.files[0]; ov.logoFile.value = '';
+  if (!f) return;
+  if (await setLogoFromBlob(f, f.name)){
+    try{ const r = new FileReader(); r.onload = () => { try{ localStorage.setItem(LOGO_KEY, JSON.stringify({ name:f.name, data:r.result })); }catch{} }; r.readAsDataURL(f); }catch{}
+    changed();
+  }
+};
+
+/* re-render all images shortly after any change */
+let ovTimer = 0;
+function changed(){
+  ov.sizeVal.textContent = ov.size.value + '%';
+  ov.logoSizeVal.textContent = ov.logoSize.value + '%';
+  ov.marginVal.textContent = ov.margin.value + '%';
+  saveOv();
+  clearTimeout(ovTimer); ovTimer = setTimeout(rerenderAll, 250);
+}
+ov.txt.addEventListener('input', () => { if (ov.txt.value.trim()) ov.txtOn.checked = true; changed(); });
+[ov.txtOn, ov.font, ov.color, ov.size, ov.stroke, ov.logoOn, ov.logoSize, ov.margin].forEach(el => el.addEventListener('input', changed));
+ov.knock.addEventListener('input', () => { buildLogo(); changed(); });
+ov.bold.onclick = () => { ov.bold.setAttribute('aria-pressed', String(ov.bold.getAttribute('aria-pressed')!=='true')); changed(); };
+ov.font.addEventListener('change', () => { ov.txt.style.fontFamily = `"${ov.font.value}", var(--f-ui)`; });
+
+function saveOv(){
+  try{ localStorage.setItem(OV_KEY, JSON.stringify({ txtOn:ov.txtOn.checked, txt:ov.txt.value, font:ov.font.value, color:ov.color.value,
+    bold:ov.bold.getAttribute('aria-pressed'), size:ov.size.value, stroke:ov.stroke.checked, logoOn:ov.logoOn.checked,
+    logoSize:ov.logoSize.value, knock:ov.knock.checked, margin:ov.margin.value })); }catch{}
+}
+async function loadOv(){
+  try{
+    const v = JSON.parse(localStorage.getItem(OV_KEY) || 'null');
+    if (v){
+      ov.txtOn.checked=!!v.txtOn; ov.txt.value=v.txt||''; if (v.font) ov.font.value=v.font; if (v.color) ov.color.value=v.color;
+      ov.bold.setAttribute('aria-pressed', v.bold||'true'); if (v.size) ov.size.value=v.size; ov.stroke.checked=!!v.stroke;
+      if (v.logoSize) ov.logoSize.value=v.logoSize; ov.knock.checked=!!v.knock; if (v.margin) ov.margin.value=v.margin;
+    }
+    const L = JSON.parse(localStorage.getItem(LOGO_KEY) || 'null');
+    if (L && L.data){ const b = await (await fetch(L.data)).blob(); await setLogoFromBlob(b, L.name); }
+    if (v) ov.logoOn.checked = !!v.logoOn && !!logoDraw;
+  }catch{}
+  ov.txt.style.fontFamily = `"${ov.font.value}", var(--f-ui)`;
+  ov.sizeVal.textContent = ov.size.value + '%';
+  ov.logoSizeVal.textContent = ov.logoSize.value + '%';
+  ov.marginVal.textContent = ov.margin.value + '%';
+}
+
+function updatePreview(){
+  const it = items.find(i => i.outURL);
+  if (it){ if (ov.prev.src !== it.outURL) ov.prev.src = it.outURL; ov.prev.hidden = false; ov.prevEmpty.hidden = true; }
+  else { ov.prev.hidden = true; ov.prevEmpty.hidden = false; }
+}
+loadOv();
 
 refresh();
 </script>
