@@ -52,6 +52,7 @@ h1{margin:0;font-size:clamp(24px,4vw,32px);font-weight:800;letter-spacing:-.02em
 .drop .hint{color:var(--muted);font-size:13px;max-width:60ch}
 .fmts{font-family:var(--f-mono);font-size:12px;color:var(--muted);letter-spacing:.02em}
 
+.bar.plain .ai-only{display:none}
 .bar{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-end;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
 .field{display:flex;flex-direction:column;gap:4px;min-width:0}
 .field label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
@@ -218,6 +219,13 @@ input[type=range]{accent-color:var(--accent);width:140px}
 
   <div class="bar">
     <div class="field">
+      <label for="mode">Chế độ</label>
+      <select id="mode">
+        <option value="remove" selected>Xoá nền</option>
+        <option value="plain">Giữ nguyên nền, chỉ chèn chữ &amp; logo</option>
+      </select>
+    </div>
+    <div class="field ai-only">
       <label for="engine">Bộ máy AI</label>
       <select id="engine">
         <option value="auto" selected>Tự động</option>
@@ -225,7 +233,7 @@ input[type=range]{accent-color:var(--accent);width:140px}
         <option value="rmbg">BRIA RMBG-1.4 (iPhone)</option>
       </select>
     </div>
-    <div class="field">
+    <div class="field ai-only">
       <label for="model">Chất lượng</label>
       <select id="model">
         <option value="isnet">Cao nhất (~170 MB, chỉ PC)</option>
@@ -233,14 +241,14 @@ input[type=range]{accent-color:var(--accent);width:140px}
         <option value="isnet_quint8">Nhanh (~40 MB)</option>
       </select>
     </div>
-    <div class="field">
+    <div class="field ai-only">
       <label for="device">Bộ xử lý</label>
       <select id="device">
         <option value="cpu" selected>CPU (ổn định)</option>
         <option value="gpu">GPU (nhanh hơn, thử nghiệm)</option>
       </select>
     </div>
-    <div class="field">
+    <div class="field ai-only">
       <label for="clean">Làm sạch nền thừa</label>
       <select id="clean">
         <option value="off">Tắt (giữ nguyên AI)</option>
@@ -248,7 +256,7 @@ input[type=range]{accent-color:var(--accent);width:140px}
         <option value="strong">Mạnh</option>
       </select>
     </div>
-    <div class="field">
+    <div class="field ai-only">
       <label for="bg">Nền mới</label>
       <div class="bgset">
         <select id="bg">
@@ -287,7 +295,7 @@ input[type=range]{accent-color:var(--accent);width:140px}
   </div>
 
   <section class="panel" id="ovPanel" aria-labelledby="ovTitle">
-    <div class="panel-head"><h2 id="ovTitle">Chèn chữ &amp; logo</h2><span>Áp dụng cho tất cả ảnh đã xoá nền, kể cả khi tải về</span></div>
+    <div class="panel-head"><h2 id="ovTitle">Chèn chữ &amp; logo</h2><span>Áp dụng cho tất cả ảnh đã xử lý, kể cả khi tải về</span></div>
     <div class="ov-grid">
       <fieldset class="ov-col">
         <legend><label class="chk"><input type="checkbox" id="txtOn"> Chữ ở góc trái trên</label></legend>
@@ -417,7 +425,7 @@ const HEIC_LIB = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.
 
 const $ = id => document.getElementById(id);
 const els = { drop:$('drop'), file:$('file'), grid:$('grid'), empty:$('empty'), run:$('run'), saveAll:$('saveAll'), share:$('share'),
-  clear:$('clear'), msg:$('msg'), meter:$('meter'), bar:$('meterbar'), count:$('count'), model:$('model'), engine:$('engine'), clean:$('clean'), device:$('device'), bg:$('bg'), color:$('color'), fmt:$('fmt'), maxdim:$('maxdim') };
+  clear:$('clear'), msg:$('msg'), meter:$('meter'), bar:$('meterbar'), count:$('count'), model:$('model'), mode:$('mode'), engine:$('engine'), clean:$('clean'), device:$('device'), bg:$('bg'), color:$('color'), fmt:$('fmt'), maxdim:$('maxdim') };
 
 const items = [];   // {id,file,name,status,input,inputURL,w,h,fg,out,outURL,err,el}
 let busy = false, uid = 0, libMod = null, heicLoaded = null;
@@ -432,7 +440,7 @@ if (IS_MOBILE){
 }
 
 /* ---------- helpers ---------- */
-function toast(t){ const d=document.createElement('div'); d.className='toast'; d.textContent=t; document.body.appendChild(d); setTimeout(()=>d.remove(),2600); }
+function toast(t){ document.querySelectorAll('.toast').forEach(x=>x.remove()); const d=document.createElement('div'); d.className='toast'; d.textContent=t; document.body.appendChild(d); setTimeout(()=>d.remove(),2600); }
 const extOf = n => (n.split('.').pop()||'').toLowerCase();
 const baseOf = n => n.replace(/\.[^.]+$/,'') || 'anh';
 const extFor = t => ({'image/png':'png','image/webp':'webp','image/jpeg':'jpg'})[t];
@@ -479,7 +487,7 @@ async function composite(fg){
   if (over) await drawOverlays(g,c.width,c.height);
   return canvasToBlob(c,type, type==='image/png'?undefined:0.95);
 }
-const outName = it => `${baseOf(it.name)}-tachnen.${extFor(els.fmt.value)}`;
+const outName = it => `${baseOf(it.name)}-${it.plain ? 'chen-logo' : 'tachnen'}.${extFor(els.fmt.value)}`;
 
 /* ---------- rendering ---------- */
 function card(it){
@@ -517,7 +525,7 @@ function paint(it){
   paintSel(it);
   const pill=el.querySelector('.pill'), stage=el.querySelector('.stage');
   const map = { reading:['Đang đọc',''], ready:['Chờ xử lý',''], run:['Đang xoá nền','run'], done:['Xong','ok'], error:['Lỗi','bad'] };
-  let [t,c]=map[it.status]; if (it.status==='done' && it.edited) t='Đã chỉnh tay'; pill.textContent=t; pill.className='pill '+c;
+  let [t,c]=map[it.status]; if (it.status==='done' && it.edited) t='Đã chỉnh tay'; else if (it.status==='done' && it.plain) t='Giữ nền'; pill.textContent=t; pill.className='pill '+c;
   el.querySelector('.ph').hidden = !!it.inputURL;
   const orig=el.querySelector('.orig'), res=el.querySelector('.res');
   if (it.inputURL && orig.src!==it.inputURL) orig.src=it.inputURL;
@@ -531,10 +539,12 @@ function paint(it){
   el.querySelector('.dl').disabled = !it.out;
 }
 function refresh(){
-  const n=items.length, done=items.filter(i=>i.status==='done').length, todo=items.filter(i=>i.status==='ready'||i.status==='error').length;
+  const plain = els.mode.value==='plain', verb = plain ? 'Chèn chữ & logo' : 'Xoá nền';
+  const n=items.length, done=items.filter(i=>i.status==='done').length, todo=items.filter(i=>pendingFor(i, plain)).length;
   els.empty.hidden = n>0;
   els.run.disabled = busy || todo===0;
-  els.run.textContent = busy ? 'Đang xử lý…' : (todo && done ? `Xoá nền (${todo} ảnh còn lại)` : 'Xoá nền');
+  els.run.textContent = busy ? 'Đang xử lý…' : (todo && done ? `${verb} (${todo} ảnh)` : verb);
+  els.mode.disabled = busy;
   const nsel = selected().length;
   els.saveAll.disabled = busy || nsel===0;
   els.saveAll.textContent = nsel ? `Tải ${nsel} ảnh đã chọn` : 'Tải ảnh đã chọn';
@@ -544,7 +554,7 @@ function refresh(){
   els.count.textContent = n ? `${done}/${n} xong` : '';
   updatePreview();
   for (const it of items) if (it.el) it.el.querySelector('.ed').disabled = busy || !it.input || it.status==='run';
-  if (!busy) els.msg.textContent = n===0 ? 'Chưa có ảnh nào.' : (todo ? `${todo} ảnh đang chờ. Bấm “Xoá nền” để bắt đầu.` : 'Đã xử lý xong tất cả.');
+  if (!busy) els.msg.textContent = n===0 ? 'Chưa có ảnh nào.' : (todo ? `${todo} ảnh đang chờ. Bấm “${verb}” để bắt đầu.` : 'Đã xử lý xong tất cả.');
 }
 
 /* ---------- adding files ---------- */
@@ -765,27 +775,39 @@ async function runOnce(removeBackground, blob, t){
 }
 els.run.onclick = async () => {
   if (busy) return;
-  const queue = items.filter(i=>i.status==='ready'||(i.status==='error'&&i.input));
-  if (!queue.length) return;
+  const plain = els.mode.value==='plain';
+  if (!items.some(i => pendingFor(i, plain))) return;
   busy=true; refresh();
-  const removeBackground = null;
+  const removeBackground = null, seen = new Set();
   let k=0;
-  for (const it of queue){
-    if (!items.includes(it)) continue;
+  // keep going until nothing is left, including images that finish loading while this run is in progress
+  for (;;){
+    const it = items.find(i => !seen.has(i) && pendingFor(i, plain));
+    if (!it){
+      if (items.some(i => i.status==='reading')){ await new Promise(r=>setTimeout(r,200)); continue; }
+      break;
+    }
+    seen.add(it);
+    const total = seen.size + items.filter(i => !seen.has(i) && (pendingFor(i, plain) || i.status==='reading')).length;
     k++; it.status='run'; it.err=''; paint(it); refresh();
-    els.msg.textContent = `Đang xoá nền ảnh ${k}/${queue.length}: ${it.name}`;
+    els.msg.textContent = `${plain ? 'Đang chèn chữ & logo' : 'Đang xoá nền'} ảnh ${k}/${total}: ${it.name}`;
     try{
-      it.raw = await cut(removeBackground, it.input);
-      await finalize(it);
+      if (plain){
+        it.raw = null; it.fg = it.input; it.plain = true; it.edited = false;   // whole image kept, no AI
+      } else {
+        it.raw = await cut(removeBackground, it.input);
+        it.plain = false; it.edited = false;
+        await finalize(it);
+      }
       await rerender(it);
       it.status='done';
     }catch(e){ console.error(e); it.status='error'; it.err='Xử lý thất bại: '+(e.message||e); }
-    els.meter.hidden=false; els.bar.style.width = Math.round(k/queue.length*100)+'%';
-    els.msg.textContent = `Đang xoá nền ảnh ${Math.min(k+1,queue.length)}/${queue.length}`;
+    els.meter.hidden=false; els.bar.style.width = Math.round(k/total*100)+'%';
+    els.msg.textContent = `Đã xử lý ${k}/${total} ảnh`;
     paint(it); refresh();
   }
   busy=false; els.meter.hidden=true; refresh();
-  toast('Xong! Bấm “Tải về” để lưu ảnh.');
+  toast(plain ? 'Xong! Đã chèn chữ & logo.' : 'Xong! Bấm “Tải về” để lưu ảnh.');
 };
 async function rerender(it){
   it.out = await composite(it.fg);
@@ -1271,6 +1293,31 @@ function updatePreview(){
   else { ov.prev.hidden = true; ov.prevEmpty.hidden = false; }
 }
 loadOv();
+
+
+/* ================= Mode: remove background, or keep it and only add text/logo ================= */
+// plain mode processes images not yet done; remove mode also picks up images that were only given text/logo
+function pendingFor(i, plain){
+  if (!i.input || i.status==='run' || i.status==='reading') return false;
+  if (i.status==='ready' || i.status==='error') return true;
+  return plain ? false : !!i.plain;
+}
+function applyMode(first){
+  const plain = els.mode.value==='plain';
+  document.querySelector('.bar').classList.toggle('plain', plain);
+  if (!first){
+    // a photo with its background kept is far smaller as JPG; transparent cut-outs need PNG
+    if (plain && els.fmt.value==='image/png') els.fmt.value='image/jpeg';
+    if (!plain && els.fmt.value==='image/jpeg' && bgValue()==='transparent') els.fmt.value='image/png';
+    try{ localStorage.setItem('tachnen-mode', els.mode.value); }catch{}
+    rerenderAll();
+    if (plain && !ov.txt.value.trim() && !logoDraw) toast('Nhập chữ hoặc chọn logo ở khung “Chèn chữ & logo” bên dưới.');
+  }
+  refresh();
+}
+els.mode.onchange = () => applyMode(false);
+try{ if (localStorage.getItem('tachnen-mode')==='plain'){ els.mode.value='plain'; if (els.fmt.value==='image/png') els.fmt.value='image/jpeg'; } }catch{}
+applyMode(true);
 
 refresh();
 </script>
